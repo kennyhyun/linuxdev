@@ -88,3 +88,7 @@ You can fork this repo and replace the git submodule to your own dotfiles repo.
   - install docker tools for the host
     - docker-cli
     - docker-compose
+
+## License
+
+[MIT License](https://github.com/kennyhyun/linuxdev/blob/main/LICENSE)
