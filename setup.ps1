@@ -37,7 +37,7 @@ if ($terminal_asset.name -match $installed_terminal_version) {
     Write-Host Found $terminal_installer, skip downloading
   } Else {
     Write-Host Downloading $terminal_asset.browser_download_url
-    Invoke-WebRequest -Uri $terminal_asset.browser_download_url -OutFile $terminal_installer
+    Invoke-WebRequest -UseBasicParsing -Uri $terminal_asset.browser_download_url -OutFile $terminal_installer
   }
   
   # Install terminal
