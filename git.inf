@@ -1,0 +1,23 @@
+[Setup]
+Lang=default
+Dir=C:\Program Files\Git
+Group=Git
+NoIcons=0
+SetupType=default
+Components=ext,ext\shellhere,ext\guihere,gitlfs,assoc,assoc_sh,windowsterminal
+Tasks=
+EditorOption=VIM
+CustomEditorPath=
+DefaultBranchOption=main
+PathOption=Cmd
+SSHOption=OpenSSH
+TortoiseOption=false
+CURLOption=OpenSSL
+CRLFOption=LFOnly
+BashTerminalOption=ConHost
+GitPullBehaviorOption=Merge
+UseCredentialManager=Core
+PerformanceTweaksFSCache=Enabled
+EnableSymlinks=Enabled
+EnablePseudoConsoleSupport=Disabled
+EnableFSMonitor=Disabled
