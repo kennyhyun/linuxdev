@@ -119,10 +119,6 @@ if (Test-Path($git_bash)) {
   Write-Host Done
 }
 
-if ($virtualization_enabled -ne "Yes") {
-  Write-Host Virtualization is not enabled, please follow this link and try to enable
-}
-
 ######################
 # Install virtual box
 #
@@ -166,4 +162,44 @@ if ($installed_vbox_version -match $vbox_installer_version.split('-')[1] ) {
     Write-Host $_
   }
   Write-Host Installed VBox.
+}
+
+######################
+# Install vagrant
+#
+try {
+  $installed_vagrant_version = vagrant --version|%{$_.split(' ')[1]}
+} catch {
+  Write-Host $_
+}
+Write-Host Vagrant version: $installed_vagrant_version
+$vagrant_url = "https://www.vagrantup.com/downloads"
+$vagrant_link = (Invoke-WebRequest -Uri $vagrant_url).Links | Where-Object {$_.href -like "*64.msi"}
+$vagrant_installer_url = [System.Uri]$vagrant_link.href
+$vagrant_installer_filename = $vagrant_installer_url.Segments[-1]
+$vagrant_installer_version = echo $vagrant_installer_filename | %{$_.Split('_')[1]}
+$vagrant_installer = "$env:temp\$($vagrant_installer_filename)"
+if ($installed_vagrant_version -match $vagrant_installer_version ) {
+  Write-Host Vagrant $vagrant_installer_version already installed
+} else {
+
+  # download installer unless exists
+  if (Test-Path($vagrant_installer)) {
+    Write-Host Found $vagrant_installer, skip downloading
+  } Else {
+    Write-Host Downloading $vagrant_installer_url
+    Invoke-WebRequest -Uri $vagrant_installer_url -OutFile $vagrant_installer
+  }
+  # Install vagrant
+  Write-Host Installing $vagrant_installer_filename
+  Try {
+    Start-Process -Wait -FilePath $vagrant_installer -Argument "/passive /norestart" -PassThru
+  } catch {
+    Write-Host $_
+  }
+  Write-Host Installed Vagrant.
+}
+
+if ($virtualization_enabled -ne "Yes") {
+  Write-Host Virtualization is not enabled, please follow this link and try to enable
 }
