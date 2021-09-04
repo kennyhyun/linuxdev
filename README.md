@@ -45,7 +45,10 @@ And if you are familiar with the command line, Using Linux makes more senses tha
 
 ## How would it be like setting up the Linux dev environment?
 
+:warning: Note that this script will disable WSL2.
+
 1. Unzip or git clone this repo
+    - https://github.com/kennyhyun/linuxdev/archive/refs/heads/main.zip
 1. Run a script
     1. Install host dependencies and dev tools
         - Windows; Open powershell as Admin
@@ -73,7 +76,7 @@ And if you are familiar with the command line, Using Linux makes more senses tha
 
 After finishing bootstrap, you can ssh into Linux dev env
 
-```
+```bash
 ssh linuxdev
 ```
 
@@ -88,3 +91,31 @@ You can fork this repo and replace the git submodule to your own dotfiles repo.
   - install docker tools for the host
     - docker-cli
     - docker-compose
+
+
+## Install
+
+### Windows 10 users
+
+> :warning: **Note that this script will disable WSL2.**
+>
+> Please backup any required files before running.
+
+Right click windows menu and click Windows Powershell (Admin)
+
+```powershell
+Set-ExecutionPolicy RemoteSigned
+```
+
+Run the setup script in the directory of this repo
+
+```powershell
+\Users\xxx\linuxdev\setup.ps1
+```
+
+** Running setup script again will check updates and install if newer version found
+
+
+## License
+
+[MIT License](https://github.com/kennyhyun/linuxdev/blob/main/LICENSE)
