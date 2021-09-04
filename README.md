@@ -121,6 +121,8 @@ Run the setup script in the directory of this repo
 
 Open Windows Terminal for Gitbash or just Git Bash
 
+You can set .env for customising. see the script for `ENV`
+
 ```bash
 /c/Users/xxx/linuxdev/bootstrap.sh
 ```
@@ -130,12 +132,12 @@ This will create virtualbox machine and bootup and config
 If finished successfully, you will get ssh into by
 
 ```bash
-ssh vagrant
+ssh linuxdev
 ```
 
 ##### Map network drive from the machine
 
-Virtualbox machine has IP of 192.168.99.123
+Virtualbox machine has IP of 192.168.99.123 by default
 and it shares Projects directory so Host machine can see the files in it.
 
 \\192.168.99.123\Projects
