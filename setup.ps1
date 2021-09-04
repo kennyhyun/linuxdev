@@ -61,7 +61,7 @@ try {
 Write-Host VS Code version: $installed_vscode_version
 
 $vscode_url = "https://code.visualstudio.com/sha/download?build=stable&os=win32-x64-user"
-$vscode_installer_url = [System.Uri](Invoke-WebRequest -Method Head -MaximumRedirection 0 -Uri $vscode_url -ErrorAction SilentlyContinue).Headers.Location
+$vscode_installer_url = [System.Uri](Invoke-WebRequest -UseBasicParsing -Method Head -MaximumRedirection 0 -Uri $vscode_url -ErrorAction SilentlyContinue).Headers.Location
 
 Write-Host VS Code installer url: $vscode_installer_url
 $vscode_installer_filename = $vscode_installer_url.Segments[-1]
@@ -78,7 +78,7 @@ if ($vscode_installer_version -match $installed_vscode_version) {
     Write-Host Found $vscode_installer, skip downloading
   } Else {
     Write-Host Downloading $vscode_installer_url
-    Invoke-WebRequest -Uri $vscode_installer_url -OutFile $vscode_installer
+    Invoke-WebRequest -UseBasicParsing -Uri $vscode_installer_url -OutFile $vscode_installer
   }
 
   # Install vs code
@@ -111,7 +111,7 @@ if (Test-Path($git_bash)) {
   if (Test-Path($installer)) {
     Write-Host Found $installer, skip downloading
   } Else {
-    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $installer
+    Invoke-WebRequest -UseBasicParsing -Uri $asset.browser_download_url -OutFile $installer
   }
 
   Write-Host Start installing $installer, $install_args
@@ -132,7 +132,7 @@ try {
 Write-Host VBox version: $installed_vbox_version
 
 $vbox_url = "https://www.virtualbox.org/wiki/Downloads"
-$vbox_link = (Invoke-WebRequest -Uri $vbox_url).Links | Where-Object {$_.href -like "*Win.exe"}
+$vbox_link = (Invoke-WebRequest -UseBasicParsing -Uri $vbox_url).Links | Where-Object {$_.href -like "*Win.exe"}
 
 $vbox_installer_url = [System.Uri]$vbox_link.href
 
@@ -151,7 +151,7 @@ if ($installed_vbox_version -match $vbox_installer_version.split('-')[1] ) {
     Write-Host Found $vbox_installer, skip downloading
   } Else {
     Write-Host Downloading $vbox_installer_url
-    Invoke-WebRequest -Uri $vbox_installer_url -OutFile $vbox_installer
+    Invoke-WebRequest -UseBasicParsing -Uri $vbox_installer_url -OutFile $vbox_installer
   }
 
   # Install vbox
@@ -174,7 +174,7 @@ try {
 }
 Write-Host Vagrant version: $installed_vagrant_version
 $vagrant_url = "https://www.vagrantup.com/downloads"
-$vagrant_link = (Invoke-WebRequest -Uri $vagrant_url).Links | Where-Object {$_.href -like "*64.msi"}
+$vagrant_link = (Invoke-WebRequest -UseBasicParsing -Uri $vagrant_url).Links | Where-Object {$_.href -like "*64.msi"}
 $vagrant_installer_url = [System.Uri]$vagrant_link.href
 $vagrant_installer_filename = $vagrant_installer_url.Segments[-1]
 $vagrant_installer_version = echo $vagrant_installer_filename | %{$_.Split('_')[1]}
@@ -188,7 +188,7 @@ if ($installed_vagrant_version -match $vagrant_installer_version ) {
     Write-Host Found $vagrant_installer, skip downloading
   } Else {
     Write-Host Downloading $vagrant_installer_url
-    Invoke-WebRequest -Uri $vagrant_installer_url -OutFile $vagrant_installer
+    Invoke-WebRequest -UseBasicParsing -Uri $vagrant_installer_url -OutFile $vagrant_installer
   }
   # Install vagrant
   Write-Host Installing $vagrant_installer_filename
