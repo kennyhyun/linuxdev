@@ -1,8 +1,16 @@
 $ErrorActionPreference = "Stop"
 
-######################
+Write-Host ==================================
+Write-Host Note: This will turn off WSL2
+Write-Host   and upgrade exsting softwares like
+Write-Host   git, vscode, windows terminal,
+Write-Host   virtualbox, vagrant
+Write-Host ==================================
+Read-Host -Prompt "Press any key to continue or ^C to stop"
+
 # Disable hyper-v
-#
+Write-Host ---------------------------------------
+Write-Host  Disabling Hypervisor Platform
 bcdedit /set hypervisorlaunchtype off
 Try {
   Disable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-Hypervisor -All -NoRestart
@@ -21,16 +29,16 @@ $virtualization_enabled = systeminfo |select-string "Virtualization Enabled"|out
 
 Write-Host Virtualization support: $virtualization_enabled
 
-######################
 # Install terminal
-#
+Write-Host ---------------------------------------
 $installed_terminal_version = (Get-AppxPackage -Name *WindowsTerminal).Version
 $terminal_url = "https://api.github.com/repos/microsoft/terminal/releases/latest"
 $terminal_asset = Invoke-RestMethod -Method Get -Uri $terminal_url | % assets | where name -like "*msixbundle"
 $terminal_installer = "$env:temp\$($terminal_asset.name)"
 if ($terminal_asset.name -match $installed_terminal_version) {
-  Write-Host Windows Terminal $installed_terminal_version already installed
+  Write-Host $terminal_asset.name already installed
 } else {
+  Write-Host  Windows Terminald
 
   # download installer unless exists
   if (Test-Path($terminal_installer)) {
@@ -52,26 +60,27 @@ if ($terminal_asset.name -match $installed_terminal_version) {
 
 ######################
 # Install vscode
-#
+Write-Host ---------------------------------------
 try {
   $installed_vscode_version = code --version| select-object -First 1
 } catch {
   Write-Host $_
 }
-Write-Host VS Code version: $installed_vscode_version
+#Write-Host VS Code version: $installed_vscode_version
 
 $vscode_url = "https://code.visualstudio.com/sha/download?build=stable&os=win32-x64-user"
 $vscode_installer_url = [System.Uri](Invoke-WebRequest -UseBasicParsing -Method Head -MaximumRedirection 0 -Uri $vscode_url -ErrorAction SilentlyContinue).Headers.Location
 
-Write-Host VS Code installer url: $vscode_installer_url
+#Write-Host VS Code installer url: $vscode_installer_url
 $vscode_installer_filename = $vscode_installer_url.Segments[-1]
 $vscode_installer_version = echo $vscode_installer_filename| %{$_.split('-')[-1]} | %{$_.SubString(0, $_.IndexOf('.exe'))}
-Write-Host $vscode_installer_filename, $vscode_installer_version
+#Write-Host $vscode_installer_filename, $vscode_installer_version
 
 $vscode_installer = "$env:temp\$($vscode_installer_filename)"
 if ($vscode_installer_version -match $installed_vscode_version) {
-  Write-Host VS Code $installed_vscode_version already installed
+  Write-Host VS Code $vscode_installer_version already installed
 } else {
+  Write-Host  VS Code
 
   # download installer unless exists
   if (Test-Path($vscode_installer)) {
@@ -94,14 +103,15 @@ if ($vscode_installer_version -match $installed_vscode_version) {
 
 ######################
 # run installer if git-bash not found
-#
+Write-Host ---------------------------------------
 $git_install_inf = "$PSScriptRoot\git.inf"
 $git_path = Get-Content $git_install_inf | Select-String "Dir" | Out-String | %{$_.trim()} | % { $_.Substring(4) }
 $git_bash = "$git_path\git-bash.exe"
 $install_args = "/SP- /SILENT /SUPPRESSMSGBOXES /NOCANCEL /NORESTART /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /LOADINF=""$git_install_inf"""
 if (Test-Path($git_bash)) {
-  Write-Host Found $git_bash
+  Write-Host Found Git $git_bash
 } Else {
+  Write-Host  Git
   # get latest download url for git-for-windows 64-bit exe
   $git_url = "https://api.github.com/repos/git-for-windows/git/releases/latest"
   $asset = Invoke-RestMethod -Method Get -Uri $git_url | % assets | where name -like "*64-bit.exe"
@@ -121,7 +131,7 @@ if (Test-Path($git_bash)) {
 
 ######################
 # Install virtual box
-#
+Write-Host ---------------------------------------
 $vbox_path = "$Env:Programfiles\Oracle\VirtualBox"
 $vbox_manage = "$vbox_path\VBoxManage"
 try {
@@ -129,7 +139,7 @@ try {
 } catch {
   Write-Host $_
 }
-Write-Host VBox version: $installed_vbox_version
+#Write-Host VBox version: $installed_vbox_version
 
 $vbox_url = "https://www.virtualbox.org/wiki/Downloads"
 $vbox_link = (Invoke-WebRequest -UseBasicParsing -Uri $vbox_url).Links | Where-Object {$_.href -like "*Win.exe"}
@@ -145,6 +155,7 @@ $vbox_installer = "$env:temp\$($vbox_installer_filename)"
 if ($installed_vbox_version -match $vbox_installer_version.split('-')[1] ) {
   Write-Host VBox $vbox_installer_version already installed
 } else {
+  Write-Host  VBox
 
   # download installer unless exists
   if (Test-Path($vbox_installer)) {
@@ -166,13 +177,13 @@ if ($installed_vbox_version -match $vbox_installer_version.split('-')[1] ) {
 
 ######################
 # Install vagrant
-#
+Write-Host ---------------------------------------
 try {
   $installed_vagrant_version = vagrant --version|%{$_.split(' ')[1]}
 } catch {
   Write-Host $_
 }
-Write-Host Vagrant version: $installed_vagrant_version
+#Write-Host Vagrant version: $installed_vagrant_version
 $vagrant_url = "https://www.vagrantup.com/downloads"
 $vagrant_link = (Invoke-WebRequest -UseBasicParsing -Uri $vagrant_url).Links | Where-Object {$_.href -like "*64.msi"}
 $vagrant_installer_url = [System.Uri]$vagrant_link.href
@@ -182,6 +193,7 @@ $vagrant_installer = "$env:temp\$($vagrant_installer_filename)"
 if ($installed_vagrant_version -match $vagrant_installer_version ) {
   Write-Host Vagrant $vagrant_installer_version already installed
 } else {
+  Write-Host  Vagrant
 
   # download installer unless exists
   if (Test-Path($vagrant_installer)) {
@@ -200,6 +212,10 @@ if ($installed_vagrant_version -match $vagrant_installer_version ) {
   Write-Host Installed Vagrant.
 }
 
+Write-Host ==================================
+Write-Host Done. Please continue to bootstrap
+
 if ($virtualization_enabled -ne "Yes") {
   Write-Host Virtualization is not enabled, please follow this link and try to enable
+  Write-Host https://www.smarthomebeginner.com/enable-hardware-virtualization-vt-x-amd-v/
 }

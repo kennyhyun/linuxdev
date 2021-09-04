@@ -45,7 +45,10 @@ And if you are familiar with the command line, Using Linux makes more senses tha
 
 ## How would it be like setting up the Linux dev environment?
 
+:warning: Note that this script will disable WSL2.
+
 1. Unzip or git clone this repo
+    - https://github.com/kennyhyun/linuxdev/archive/refs/heads/main.zip
 1. Run a script
     1. Install host dependencies and dev tools
         - Windows; Open powershell as Admin
@@ -93,6 +96,10 @@ You can fork this repo and replace the git submodule to your own dotfiles repo.
 ## Install
 
 ### Windows 10 users
+
+> :warning: **Note that this script will disable WSL2.**
+>
+> Please backup any required files before running.
 
 Right click windows menu and click Windows Powershell (Admin)
 
