@@ -97,6 +97,8 @@ You can fork this repo and replace the git submodule to your own dotfiles repo.
 
 ### Windows 10 users
 
+#### setup.ps1
+
 > :warning: **Note that this script will disable WSL2.**
 >
 > Please backup any required files before running.
@@ -114,6 +116,31 @@ Run the setup script in the directory of this repo
 ```
 
 ** Running setup script again will check updates and install if newer version found
+
+##### bootstrap.sh
+
+Open Windows Terminal for Gitbash or just Git Bash
+
+```bash
+/c/Users/xxx/linuxdev/bootstrap.sh
+```
+
+This will create virtualbox machine and bootup and config
+
+If finished successfully, you will get ssh into by
+
+```bash
+ssh vagrant
+```
+
+##### Map network drive from the machine
+
+Virtualbox machine has IP of 192.168.99.123
+and it shares Projects directory so Host machine can see the files in it.
+
+\\192.168.99.123\Projects
+
+** Windows git global config should turn filemode off
 
 
 ## License
