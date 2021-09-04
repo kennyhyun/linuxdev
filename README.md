@@ -106,6 +106,7 @@ Run the setup script in the directory of this repo
 \Users\xxx\linuxdev\setup.ps1
 ```
 
+** Running setup script again will check updates and install if newer version found
 
 
 ## License
