@@ -73,7 +73,7 @@ And if you are familiar with the command line, Using Linux makes more senses tha
 
 After finishing bootstrap, you can ssh into Linux dev env
 
-```
+```bash
 ssh linuxdev
 ```
 
@@ -88,6 +88,25 @@ You can fork this repo and replace the git submodule to your own dotfiles repo.
   - install docker tools for the host
     - docker-cli
     - docker-compose
+
+
+## Install
+
+### Windows 10 users
+
+Right click windows menu and click Windows Powershell (Admin)
+
+```powershell
+Set-ExecutionPolicy RemoteSigned
+```
+
+Run the setup script in the directory of this repo
+
+```powershell
+\Users\xxx\linuxdev\setup.ps1
+```
+
+
 
 ## License
 
