@@ -36,7 +36,7 @@ $terminal_url = "https://api.github.com/repos/microsoft/terminal/releases/latest
 $terminal_asset = Invoke-RestMethod -Method Get -Uri $terminal_url | % assets | where name -like "*msixbundle"
 $terminal_installer = "$env:temp\$($terminal_asset.name)"
 Write-Host $terminal_asset.name
-if ($terminal_asset.name -match $installed_terminal_version) {
+if ($installed_terminal_version -And $terminal_asset.name -match $installed_terminal_version) {
   Write-Host already installed
 } else {
   # download installer unless exists
