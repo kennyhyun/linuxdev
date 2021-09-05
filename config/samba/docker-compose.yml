@@ -9,6 +9,5 @@ services:
     command:
       - --no-process-group
     volumes:
-      - /etc/passwd:/etc/passwd
       - ./smb.conf:/etc/samba/smb.conf
       - $HOME/Projects:/storage/Projects

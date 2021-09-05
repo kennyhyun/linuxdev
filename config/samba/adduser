@@ -10,7 +10,7 @@ fi
 echo $0
 
 docker exec -it samba adduser -s /sbin/nologin -h /home/samba -H -D $1
-docker exec -it samba smbpasswd -a $1
+docker exec -it samba smbpasswd -U $1 -w vagrant
 
 sed s/USER/${1}/g $DIR/smb.conf.source > $DIR/smb.conf
 docker restart samba

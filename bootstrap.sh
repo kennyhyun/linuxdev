@@ -104,12 +104,13 @@ echo "Installing docker-compose...."
 sudo apt install docker-compose -y
 docker-compose --version
 echo "Configuring samba"
-mkdir ~/Projects
-cd /vagrant/config/samba
+mkdir -p ~/Projects
+mkdir -p samba
+cp /vagrant/config/samba/* samba/
+cd samba
+docker-compose down
 docker-compose up -d
-echo "vagrant
-vagrant
-" | ./adduser \$USER
+docker cp /etc/passwd samba:/etc/passwd
 
 EOSSH
 
