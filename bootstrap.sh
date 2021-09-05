@@ -20,7 +20,7 @@ fi
 machine_name=${NAME:-linuxdev}
 echo Welcome $username! Pleae wait a moment for bootstrapping $machine_name
 
-vagrant plugin install vagrant-env
+#vagrant plugin install vagrant-env
 vagrant up
 
 # create ssh config file
@@ -111,6 +111,7 @@ cd samba
 docker-compose down
 docker-compose up -d
 docker cp /etc/passwd samba:/etc/passwd
+./adduser \$USER
 
 EOSSH
 
