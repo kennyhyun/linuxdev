@@ -145,6 +145,42 @@ and it shares Projects directory so Host machine can see the files in it.
 ** Windows git global config should turn filemode off
 
 
+## Configure .env
+
+You can create .env to customize. The default values will be used if not exists.
+
+### Name
+
+```
+NAME=awesome-name
+```
+
+This will rename the machine name in VirtualBox. run `vagrant reload` to apply when udpated.
+
+### Cpus and memory
+
+```
+CPUS=4
+MEMORY=8192
+```
+
+This will adjust cpus and memory, run `vagrant reload` to apply when udpated.
+
+### Expand disk size :warning:
+
+```
+EXPAND_DISK_GB=10
+```
+
+It's using 60GB of disk image but it's dynamically allocated.
+It's is great in most case but when the disk space is expanded, the VM performance will be deteriorated.
+
+This will expand the disk during bootstrap along creating swapfile.
+And you will have some slowness on the VM for a while but would not be slow while using the VM afterwhile.
+
+This should be setup before running bootstrap.
+Or you can retry after removing /swapfile
+
 ## License
 
 [MIT License](https://github.com/kennyhyun/linuxdev/blob/main/LICENSE)
