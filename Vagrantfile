@@ -66,7 +66,7 @@ Vagrant.configure("2") do |config|
   # View the documentation for the provider you are using for more
   # information on available options.
   config.vm.provider "virtualbox" do |vb|
-    vb.name = ENV['NAME'] || "debian1010"
+    vb.name = ENV['NAME'] || "linuxdev"
     vb.gui = false
     vb.memory = ENV['MEMORY'] || 1024
     vb.cpus = ENV['CPUS'] || 2

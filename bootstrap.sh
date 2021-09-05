@@ -17,6 +17,9 @@ username=${input:-vagrant}
 echo "VAGRANT_USERNAME=$username">> .env
 fi
 
+machine_name=${NAME:-linuxdev}
+echo Welcome $username! Pleae wait a moment for bootstrapping $machine_name
+
 vagrant plugin install vagrant-env
 vagrant up
 
@@ -82,15 +85,15 @@ echo "$username ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/98_$username
 chmod 440 /etc/sudoers.d/98_$username
 EOSSH
 
-if [[ -z $(grep linuxdev ~/.ssh/config) ]]; then
-  echo adding ssh config for linuxdev
-  sed -e "0,/vagrant/{s/vagrant/$username/}" -e "0,/default/{s/default/linuxdev/}" $SSH_CONFIG >> ~/.ssh/config
+if [[ -z $(grep $machine_name ~/.ssh/config) ]]; then
+  echo adding ssh config for $machine_name
+  sed -e "0,/vagrant/{s/vagrant/$username/}" -e "0,/default/{s/default/$machine_name/}" $SSH_CONFIG >> ~/.ssh/config
 fi
 
 #### user $username
-ssh linuxdev << EOSSH
+ssh $machine_name << EOSSH
 
-echo Hello $(whoami) !!!!!!!
+echo "------------------------\nHello from $machine_name, $(whoami)"
 sudo apt update && sudo apt install git zsh -y
 wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
 sh install.sh --unattended
