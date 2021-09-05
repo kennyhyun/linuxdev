@@ -91,7 +91,7 @@ usermod -aG docker $username
 
 if [ $swapfile ]; then
   echo Found SWAPFILE config
-  if [[ ! -f "/swapfile" ]]; then
+  if [[ ! -f /swapfile ]]; then
     echo "-----
 Creating swapfile"
     dd if=/dev/zero of=/swapfile bs=512M count=2 oflag=append conv=notrunc
@@ -109,7 +109,7 @@ fi
 swapon --show
 free -h
 
-if [[ ! -f "/dummy" ]]; then
+if [[ ! -f /dummy ]]; then
   echo "-----
 Expanding actual size for ${expand_disk_size}GB"
   #fallocate -l ${expand_disk_size}G /dummy
@@ -149,11 +149,9 @@ docker-compose up -d
 docker cp /etc/passwd samba:/etc/passwd
 ./adduser \$USER
 
-if [[ -f "/dummy" ]]; then
+if [[ -f /dummy ]]; then
   filesize=\$(stat -c%s "/dummy")
-  echo dummy size: \$filesize
   if (( filesize > 1 )); then
-    echo remove dummy and create
     sudo rm /dummy
     sudo touch /dummy
   fi
