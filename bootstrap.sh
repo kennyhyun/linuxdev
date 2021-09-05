@@ -149,6 +149,11 @@ docker-compose up -d
 docker cp /etc/passwd samba:/etc/passwd
 ./adduser \$USER
 
+echo "-----\nGenerating ssh key"
+ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ""
+echo "Paste the public key below into Github or else"
+cat ~/.ssh/id_rsa.pub
+
 if [[ -f /dummy ]]; then
   filesize=\$(stat -c%s "/dummy")
   if (( filesize > 1 )); then
