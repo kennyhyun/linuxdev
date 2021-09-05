@@ -97,6 +97,8 @@ You can fork this repo and replace the git submodule to your own dotfiles repo.
 
 ### Windows 10 users
 
+#### setup.ps1
+
 > :warning: **Note that this script will disable WSL2.**
 >
 > Please backup any required files before running.
@@ -115,6 +117,72 @@ Run the setup script in the directory of this repo
 
 ** Running setup script again will check updates and install if newer version found
 
+##### bootstrap.sh
+
+Open Windows Terminal for Gitbash or just Git Bash
+
+You can set .env for customising. see the script for `ENV`
+
+```bash
+/c/Users/xxx/linuxdev/bootstrap.sh
+```
+
+This will create virtualbox machine and bootup and config
+
+If finished successfully, you will get ssh into by
+
+```bash
+ssh linuxdev
+```
+
+It's okay to repeat this bootstrap script. but if you want to repeat from scratch for some reason,
+you can run `./destroy.sh` and retry.
+
+##### Map network drive from the machine
+
+Virtualbox machine has IP of 192.168.99.123 by default
+and it shares Projects directory so Host machine can see the files in it.
+
+\\192.168.99.123\Projects
+
+** Windows git global config should turn filemode off
+
+
+## Configure .env
+
+You can create .env to customize. The default values will be used if not exists.
+
+### Name
+
+```
+NAME=awesome-name
+```
+
+This will rename the machine name in VirtualBox. run `vagrant reload` to apply when udpated.
+
+### Cpus and memory
+
+```
+CPUS=4
+MEMORY=8192
+```
+
+This will adjust cpus and memory, run `vagrant reload` to apply when udpated.
+
+### Expand disk size :warning:
+
+```
+EXPAND_DISK_GB=10
+```
+
+It's using 60GB of disk image but it's dynamically allocated.
+It's is great in most case but when the disk space is expanded, the VM performance will be deteriorated.
+
+This will expand the disk during bootstrap along creating swapfile.
+And you will have some slowness on the VM for a while but would not be slow while using the VM afterwhile.
+
+This should be setup before running bootstrap.
+Or you can retry after removing /swapfile
 
 ## License
 
