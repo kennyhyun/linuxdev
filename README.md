@@ -135,6 +135,9 @@ If finished successfully, you will get ssh into by
 ssh linuxdev
 ```
 
+It's okay to repeat this bootstrap script. but if you want to repeat from scratch for some reason,
+you can run `./destroy.sh` and retry.
+
 ##### Map network drive from the machine
 
 Virtualbox machine has IP of 192.168.99.123 by default

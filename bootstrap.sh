@@ -8,6 +8,9 @@ echo =================================
 
 source .env
 
+expand_disk_size=${EXPAND_DISK_GB:-4}
+swapfile=${SWAPFILE:-}
+
 # get username from env or prompt
 username=$VAGRANT_USERNAME
 if [ -z "$VAGRANT_USERNAME" ]; then
@@ -74,6 +77,7 @@ if [ ! -d "/home/$username/.ssj" ]; then
 fi
 grep $username /etc/passwd
 EOSSH
+echo ---------------------
 fi
 
 # Adding $username to Sudoer 
@@ -84,11 +88,43 @@ usermod -aG sudo $username
 echo "$username ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/98_$username
 chmod 440 /etc/sudoers.d/98_$username
 usermod -aG docker $username
+
+if [ $swapfile ]; then
+  echo Found SWAPFILE config
+  if [[ ! -f "/swapfile" ]]; then
+    echo "-----
+Creating swapfile"
+    dd if=/dev/zero of=/swapfile bs=512M count=2 oflag=append conv=notrunc
+    chmod 600 /swapfile
+    mkswap /swapfile
+  fi
+  echo "-----
+Adding swapfile"
+  sudo swapon /swapfile
+  if [[ -z "$(grep swapfile -w /etc/fstab)" ]]; then
+    echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
+  fi
+  mount -a
+fi
+swapon --show
+free -h
+
+if [[ ! -f "/dummy" ]]; then
+  echo "-----
+Expanding actual size for ${expand_disk_size}GB"
+  #fallocate -l ${expand_disk_size}G /dummy
+  dd if=/dev/zero of=/dummy bs=1G count=$expand_disk_size oflag=append conv=notrunc
+fi
+
 EOSSH
 
+echo ---------------------
 if [[ -z $(grep $machine_name ~/.ssh/config) ]]; then
   echo adding ssh config for $machine_name
   sed -e "0,/vagrant/{s/vagrant/$username/}" -e "0,/default/{s/default/$machine_name/}" $SSH_CONFIG >> ~/.ssh/config
+else
+  echo $machine_name entry found in ~/.ssh/config. Please double check if Port is correct:
+  grep $machine_name ~/.ssh/config -A10|grep Port
 fi
 
 #### user $username
@@ -100,10 +136,10 @@ wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
 sh install.sh --unattended
 rm -f install.sh*
 sudo chsh -s /bin/zsh $username
-echo "Installing docker-compose...."
+echo "-----\nInstalling docker-compose...."
 sudo apt install docker-compose -y
 docker-compose --version
-echo "Configuring samba"
+echo "-----\nConfiguring samba"
 mkdir -p ~/Projects
 mkdir -p samba
 cp /vagrant/config/samba/* samba/
@@ -113,9 +149,14 @@ docker-compose up -d
 docker cp /etc/passwd samba:/etc/passwd
 ./adduser \$USER
 
+if [[ -f "/dummy" ]]; then
+  filesize=\$(stat -c%s "/dummy")
+  echo dummy size: \$filesize
+  if (( filesize > 1 )); then
+    echo remove dummy and create
+    sudo rm /dummy
+    sudo touch /dummy
+  fi
+fi
 EOSSH
-
-
-
-
-
+echo ---------------------
