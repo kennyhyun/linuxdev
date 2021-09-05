@@ -23,7 +23,7 @@ fi
 machine_name=${NAME:-linuxdev}
 echo Welcome $username! Pleae wait a moment for bootstrapping $machine_name
 
-#vagrant plugin install vagrant-env
+vagrant plugin install vagrant-env
 vagrant up
 
 # create ssh config file
@@ -131,7 +131,13 @@ fi
 ssh $machine_name << EOSSH
 
 echo "------------------------\nHello from $machine_name, $(whoami)"
-sudo apt update && sudo apt install git zsh -y
+sudo apt remove vim -y
+sudo apt update && sudo apt install \
+git \
+zsh \
+vim-gtk \
+python3-pip \
+-y
 wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
 sh install.sh --unattended
 rm -f install.sh*
@@ -149,10 +155,14 @@ docker-compose up -d
 docker cp /etc/passwd samba:/etc/passwd
 ./adduser \$USER
 
+if [[ ! -f ~/.ssh/id_rsa ]]; then
 echo "-----\nGenerating ssh key"
 ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ""
+fi
 echo "Paste the public key below into Github or else"
+echo ---------------------
 cat ~/.ssh/id_rsa.pub
+echo ---------------------
 
 if [[ -f /dummy ]]; then
   filesize=\$(stat -c%s "/dummy")
@@ -162,4 +172,13 @@ if [[ -f /dummy ]]; then
   fi
 fi
 EOSSH
-echo ---------------------
+
+echo "Congrats!
+
+You can ssh into the machine by
+
+ssh $machine_name
+
+run /vagrant/init_dotfiles.sh to continue setting up dotfiles
+Don't forget to paste the ssh key to the dotfile repo host like Github
+"
