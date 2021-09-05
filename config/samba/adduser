@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+echo $0 $1, $DIR
+if [ $# -ne 1 ]; then
+  echo "Usage: ./adduser USER"
+  exit
+fi
+
+echo $0
+
+docker exec -it samba adduser -s /sbin/nologin -h /home/samba -H -D $1
+docker exec -it samba smbpasswd -a $1
+
+sed s/USER/${1}/g $DIR/smb.conf.source > $DIR/smb.conf
+docker restart samba

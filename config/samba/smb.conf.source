@@ -1,0 +1,36 @@
+[global]
+  workgroup = WORKGROUP
+  server string = %h server (Samba, Alpine)
+  security = user
+  map to guest = Bad User
+  encrypt passwords = yes
+  load printers = no
+  printing = bsd
+  printcap name = /dev/null
+  disable spoolss = yes
+  disable netbios = yes
+  server role = standalone
+  server services = -dns, -nbt
+  smb ports = 445
+  ;name resolve order = hosts
+  ;log level = 3
+
+  create mask = 0664
+  directory mask = 0775
+  veto files = /.DS_Store/
+  nt acl support = no
+  inherit acls = yes
+  ea support = yes
+  ;vfs objects = catia fruit streams_xattr recycle
+  ;acl_xattr:ignore system acls = yes
+  ;recycle:repository = .recycle
+  ;recycle:keeptree = yes
+  ;recycle:versions = yes
+
+[Projects]
+  path = /storage/Projects
+  comment = Projects
+  browseable = yes
+  writable = yes
+  valid users = USER
+

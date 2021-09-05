@@ -1,0 +1,14 @@
+version: '2.4'
+services:
+  samba:
+    image: stanback/alpine-samba #stanback/alpine-samba@sha256:4d9b6945e4d639dc0ab13d03d2648002d21982065bea70bca86a445b9f39ab3a
+    restart: always
+    container_name: samba
+    ports:
+      - 445:445
+    command:
+      - --no-process-group
+    volumes:
+      - /etc/passwd:/etc/passwd
+      - ./smb.conf:/etc/samba/smb.conf
+      - $HOME/Projects:/storage/Projects

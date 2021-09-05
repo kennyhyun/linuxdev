@@ -83,6 +83,7 @@ echo Adding $username to Sudoer
 usermod -aG sudo $username
 echo "$username ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/98_$username
 chmod 440 /etc/sudoers.d/98_$username
+usermod -aG docker $username
 EOSSH
 
 if [[ -z $(grep $machine_name ~/.ssh/config) ]]; then
@@ -99,6 +100,16 @@ wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
 sh install.sh --unattended
 rm -f install.sh*
 sudo chsh -s /bin/zsh $username
+echo "Installing docker-compose...."
+sudo apt install docker-compose -y
+docker-compose --version
+echo "Configuring samba"
+mkdir ~/Projects
+cd /vagrant/config/samba
+docker-compose up -d
+echo "vagrant
+vagrant
+" | ./adduser \$USER
 
 EOSSH
 
