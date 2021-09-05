@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set +e
+
 echo =================================
 echo Bootstrap vagrant machine
 echo =================================
@@ -19,8 +21,8 @@ vagrant plugin install vagrant-env
 vagrant up
 
 # create ssh config file
-SSH_CONFIG=./ssh.config
-if [ ! -f "$SSH_CONFIG" ]; then
+SSH_CONFIG="./ssh.config"
+if [ -z "$(grep vagrant $SSH_CONFIG)" ]; then
 vagrant ssh-config >> $SSH_CONFIG
 fi
 
@@ -30,21 +32,28 @@ fi
 ssh="ssh -F $SSH_CONFIG default"
 exists=$($ssh id -u $username 2>/dev/null)
 vagrant_uid=$($ssh id -u vagrant 2>/dev/null)
-if [[ $vagrant_uid == 1000 || $exists != 1000 ]]; then
+
+set -e
+
+if [[ $vagrant_uid == 1000 || ($exists != "" && $exists != 1000) ]]; then
   echo switching is required, remove $username and try again
+fi
+if [[ -z "$vagrant_uid" ]]; then
+  echo ssh connection looks like failed
+  exit -1;
 fi
 $ssh sudo cp -a /home/vagrant/.ssh /root/
 $ssh sudo chown -R root:root /root/.ssh
 
-if [[ ! -f "$SSH_CONFIG.root" ]]; then
+if [[ -z "$(grep root $SSH_CONFIG.root)" ]]; then
   sed -e '0,/vagrant/{s/vagrant/root/}' -e '0,/default/{s/default/root/}' $SSH_CONFIG >> $SSH_CONFIG.root
 fi
 #### user root
 ssh="ssh -F $SSH_CONFIG.root root"
 
-echo iexists: $exists
 
 if [[ -z "$exists" ]]; then
+echo "user $username not found"
   $ssh << EOSSH
 echo ---------------------
 echo "creating $username"
