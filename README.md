@@ -2,9 +2,8 @@
 
 Boot up Linux development env using Vagrant
 
-## This repo is in development
+**:warning: This repo is still in development** 
 
-It's not recommended to use yet.
 
 ## Why?
 
@@ -70,6 +69,7 @@ And if you are familiar with the command line, Using Linux makes more senses tha
     - ohmyzsh
     - expose samba share, `Projects`
     - generate id_rsa key and show public key
+    - add ssh config for linuxdev
 
 It's okay to repeat this bootstrap script.
 
@@ -98,10 +98,12 @@ You can override repo by `DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git`
 
 If you want to repeat from scratch for some reason, you can run `./destroy.sh` and retry `bootstrap.sh`.
 
+## Details For Windows 10 users
 
-### Details For Windows 10 users
+<details>
+  <summary>Click to expand!</summary>
 
-#### setup.ps1
+### setup.ps1
 
 > :warning: **Note that this script will disable WSL2(Hyper-V).**
 >
@@ -121,7 +123,7 @@ Run the setup script in the directory of this repo
 
 ** Running setup script again will check updates and install if newer version found
 
-##### bootstrap.sh
+### bootstrap.sh
 
 Open Windows Terminal for Gitbash or just Git Bash
 
@@ -133,7 +135,7 @@ In linuxdev dir (this repo)
 
 This will create virtualbox machine and bootup and config
 
-##### Map network drive from the machine
+### Map network drive from the machine
 
 Virtualbox machine has IP of 192.168.99.123 by default
 and it shares Projects directory so Host machine can see the files in it.
@@ -142,8 +144,8 @@ and it shares Projects directory so Host machine can see the files in it.
 
 ** Windows git global config should turn filemode off
 
-
-
+</details>
+    
 ## Configure .env
 
 You can create .env to customize. The default values will be used if not exists.
