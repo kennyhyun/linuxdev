@@ -90,7 +90,7 @@ It installs basic devtools from external [dotfiles project](https://github.com/k
 
 You can override repo by `DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git`
 
-### Commands
+### Commands after setup
 
 - `vagrant halt` to shut down the VM
 - `vagrant up` to turn on the VM
