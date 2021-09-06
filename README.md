@@ -13,17 +13,17 @@ Docker is necessary for developing nowadays. But if you are not using Linux as t
 I was using Linux in Virtualbox for many years and found that was quite nice and had no problem for using docker in it.
 In the other hand, Docker Desktop, I found couple of issue with using Docker Desktop in Windows recently.
 
-### Docker vs VM
+### Docker Desktop vs VM
 
-#### Docker
+#### Docker Desktop
 
 - Watching files in the host is not working
-- Hyper-v is not returning unused memory frequently so the host is easy to struggle with memory.
+- Hyper-v is not returning unused memory frequently so the host can be struggling with memory.
 
 #### VM
 
-Virtualbox seems to run many containers more stable and does not apply much pressure to the host memory.
-And there are less issues in developing in Linux than Windows
+- Virtualbox seems to run many containers more stable and does not apply much pressure to the host memory.
+- There are less issues in developing in Linux than Windows
 
 ### For Mac Users
 
