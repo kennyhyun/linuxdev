@@ -43,59 +43,63 @@ And if you are familiar with the command line, Using Linux makes more senses tha
 - Faster host(Linux VM) volume sharing
 - Free
 
-## How would it be like setting up the Linux dev environment?
+## Setting up the Linux dev environment
 
 :warning: Note that this script will disable WSL2.
 
+### Running scripts
+
 1. Unzip or git clone this repo
     - https://github.com/kennyhyun/linuxdev/archive/refs/heads/main.zip
-1. Run a script
-    1. Install host dependencies and dev tools
-        - Windows; Open powershell as Admin
-          - disable hyper-v
-          - VSCode
-          - Windows Terminal
-          - gitbash with unix tools
-          - Other tools like DB clients (optional)
-        - Mac
-          - VSCode
-          - iTerm2
-          - Rectangle
-          - Other tools like DB clients (optional)
-        - Common
-          - vagrant
-          - virtualbox
-    1. Bootup vagrant with provision
-        - Latest Debian Linux
-        - Install Docker
-    1. input username
-    1. Run ssh scripts into VM to bootstrap, top half
-        - Create a user with UID 1000 and sudoer
-        - Create ssh credentials and show public key
-        - install basic devtools from external [dotfiles project](https://github.com/kennyhyun/dotfiles)
+1. Run setup scripts
+    - Windows
+        1. Install host dependencies and dev tools
+            - Open powershell as Admin and run `setup.ps1`
+        1. Bootup vagrant with provision
+            - Open terminal (git bash) and run `bootstrap.sh`
+    - Mac
+        1. Install host dependencies and dev tools
+            - Open teminal and run `setup.sh`
+        1. Bootup vagrant with provision
+            - continue to run `bootstrap.sh`
+1. Wait until bootstrap.sh does
+    - input username to use in the VM
+    - Install latest Debian Linux
+    - Install Docker
+    - Create a user with UID 1000 and sudoer
+    - ohmyzsh
+    - expose samba share, `Projects`
+    - generate id_rsa key and show public key
 
-After finishing bootstrap, you can ssh into Linux dev env
+It's okay to repeat this bootstrap script.
+
+### After finished bootstrap
+
+Copy and paste ssh public key to use in Github and so on
+
+Now you can ssh into Linux dev env
 
 ```bash
 ssh linuxdev
 ```
 
-## External dotfiles
+Run `init_dotfiles.sh` to continue setting up dotfiles
+In ssh, run `/vagrant/init_dotfiles.sh` 
 
-You can fork this repo and replace the git submodule to your own dotfiles repo.
+It installs basic devtools from external [dotfiles project](https://github.com/kennyhyun/dotfiles)
 
-## Additional Goals
+You can override repo by `DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git`
 
-- Docker support for the host
-  - create docker certificates
-  - install docker tools for the host
-    - docker-cli
-    - docker-compose
+### Commands
+
+- `vagrant halt` to shut down the VM
+- `vagrant up` to turn on the VM
+- `./destory.sh` to start from scratch
+
+If you want to repeat from scratch for some reason, you can run `./destroy.sh` and retry `bootstrap.sh`.
 
 
-## Install
-
-### Windows 10 users
+### For Windows 10 users
 
 #### setup.ps1
 
@@ -121,22 +125,13 @@ Run the setup script in the directory of this repo
 
 Open Windows Terminal for Gitbash or just Git Bash
 
-You can set .env for customising. see the script for `ENV`
+In linuxdev dir (this repo)
 
 ```bash
-/c/Users/xxx/linuxdev/bootstrap.sh
+./bootstrap.sh
 ```
 
 This will create virtualbox machine and bootup and config
-
-If finished successfully, you will get ssh into by
-
-```bash
-ssh linuxdev
-```
-
-It's okay to repeat this bootstrap script. but if you want to repeat from scratch for some reason,
-you can run `./destroy.sh` and retry.
 
 ##### Map network drive from the machine
 
@@ -146,6 +141,7 @@ and it shares Projects directory so Host machine can see the files in it.
 \\192.168.99.123\Projects
 
 ** Windows git global config should turn filemode off
+
 
 
 ## Configure .env
@@ -183,6 +179,16 @@ And you will have some slowness on the VM for a while but would not be slow whil
 
 This should be setup before running bootstrap.
 Or you can retry after removing /swapfile
+
+
+## Additional Goals
+
+- Docker support for the host
+  - create docker certificates
+  - install docker tools for the host
+    - docker-cli
+    - docker-compose
+
 
 ## License
 
