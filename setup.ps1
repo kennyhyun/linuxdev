@@ -1,16 +1,16 @@
 $ErrorActionPreference = "Stop"
 
-Write-Host ==================================
-Write-Host Note: This will turn off WSL2
-Write-Host   and upgrade exsting softwares like
-Write-Host   git, vscode, windows terminal,
-Write-Host   virtualbox, vagrant
-Write-Host ==================================
+Write-Host "==================================
+Note: This will turn off WSL2
+  and upgrade exsting softwares like
+  git, vscode, windows terminal,
+  virtualbox, vagrant
+=================================="
 Read-Host -Prompt "Press any key to continue or ^C to stop"
 
 # Disable hyper-v
 Write-Host ---------------------------------------
-Write-Host  Disabling Hypervisor Platform
+Write-Host " Disabling Hypervisor Platform"
 bcdedit /set hypervisorlaunchtype off
 Try {
   Disable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-Hypervisor -All -NoRestart
@@ -51,7 +51,7 @@ if ($installed_terminal_version -And $terminal_asset.name -match $installed_term
   Try {
     Add-AppPackage -path $terminal_installer
   } catch {
-    Write-Host $_
+    Write-/$_
   }
   Write-Host Installed Windows Terminal.
 }
