@@ -175,12 +175,20 @@ if [[ -f /dummy ]]; then
 fi
 EOSSH
 
-echo "Congrats!
+echo "
+Congrats!!!
 
-You can ssh into the machine by
+You can now ssh into the machine by
 
+```
 ssh $machine_name
+```
 
-run /vagrant/init_dotfiles.sh to continue setting up dotfiles
-Don't forget to paste the ssh key to the dotfile repo host like Github
+- In ssh, run `/vagrant/init_dotfiles.sh` to continue setting up dotfiles
+    - you can override repo by `DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git`
+- `./destory.sh` to start from scratch
+- `vagrant halt` to shut down the VM
+- `vagrant up` to turn on the VM
+
+Don't forget to paste the ssh key above to the dotfile repo host like Github
 "
