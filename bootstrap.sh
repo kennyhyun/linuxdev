@@ -71,7 +71,7 @@ if [[ \$vagrant_uid == 1000 ]]; then
 fi
 chown -R vagrant:vagrant /home/vagrant
 useradd $username -u 1000 --create-home
-if [ ! -d "/home/$username/.ssj" ]; then
+if [ ! -d "/home/$username/.ssh" ]; then
   cp -a /home/vagrant/.ssh /home/$username/
   chown -R $username:$username /home/$username/.ssh
 fi
@@ -155,7 +155,9 @@ docker-compose up -d
 docker cp /etc/passwd samba:/etc/passwd
 ./adduser \$USER
 
-if [[ ! -f ~/.ssh/id_rsa ]]; then
+if [[ -f ~/.ssh/id_rsa ]]; then
+echo "-----\nssh key aleady exists"
+else
 echo "-----\nGenerating ssh key"
 ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ""
 fi
