@@ -71,7 +71,7 @@ if [[ \$vagrant_uid == 1000 ]]; then
 fi
 chown -R vagrant:vagrant /home/vagrant
 useradd $username -u 1000 --create-home
-if [ ! -d "/home/$username/.ssj" ]; then
+if [ ! -d "/home/$username/.ssh" ]; then
   cp -a /home/vagrant/.ssh /home/$username/
   chown -R $username:$username /home/$username/.ssh
 fi
