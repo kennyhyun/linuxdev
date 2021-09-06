@@ -155,7 +155,9 @@ docker-compose up -d
 docker cp /etc/passwd samba:/etc/passwd
 ./adduser \$USER
 
-if [[ ! -f ~/.ssh/id_rsa ]]; then
+if [[ -f ~/.ssh/id_rsa ]]; then
+echo "-----\nssh key aleady exists"
+else
 echo "-----\nGenerating ssh key"
 ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ""
 fi
