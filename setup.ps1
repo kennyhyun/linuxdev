@@ -51,7 +51,7 @@ if ($installed_terminal_version -And $terminal_asset.name -match $installed_term
   Try {
     Add-AppPackage -path $terminal_installer
   } catch {
-    Write-/$_
+    Write-Host $_
   }
   Write-Host Installed Windows Terminal.
 }
