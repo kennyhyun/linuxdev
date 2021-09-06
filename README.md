@@ -45,7 +45,7 @@ And if you are familiar with the command line, Using Linux makes more senses tha
 
 ## Setting up the Linux dev environment
 
-:warning: Note that this script will disable WSL2.
+:warning: Note for Windows users: The script will disable Hyper-v (WSL2).
 
 ### Running scripts
 
@@ -103,7 +103,7 @@ If you want to repeat from scratch for some reason, you can run `./destroy.sh` a
 
 #### setup.ps1
 
-> :warning: **Note that this script will disable WSL2.**
+> :warning: **Note that this script will disable WSL2(Hyper-V).**
 >
 > Please backup any required files before running.
 
