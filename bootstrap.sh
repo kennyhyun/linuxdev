@@ -161,6 +161,7 @@ cd samba
 docker-compose down
 docker-compose up -d
 docker cp /etc/passwd samba:/etc/passwd
+chmod +x adduser
 ./adduser \$USER
 
 if [ -f ~/.ssh/id_rsa ]; then
