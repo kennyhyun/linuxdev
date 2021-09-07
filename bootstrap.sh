@@ -155,7 +155,7 @@ docker-compose up -d
 docker cp /etc/passwd samba:/etc/passwd
 ./adduser \$USER
 
-if [[ -f ~/.ssh/id_rsa ]]; then
+if [ -f ~/.ssh/id_rsa ]; then
 echo "-----\nssh key aleady exists"
 else
 echo "-----\nGenerating ssh key"
@@ -166,9 +166,10 @@ echo ---------------------
 cat ~/.ssh/id_rsa.pub
 echo ---------------------
 
-if [[ -f /dummy ]]; then
+if [ -f /dummy ]; then
   filesize=\$(stat -c%s "/dummy")
   if (( filesize > 1 )); then
+    echo \$filesize was larger than 1
     sudo rm /dummy
     sudo touch /dummy
   fi
@@ -179,16 +180,15 @@ echo "
 Congrats!!!
 
 You can now ssh into the machine by
-
-```
+\`\`\`
 ssh $machine_name
-```
+\`\`\`
 
-- In ssh, run `/vagrant/init_dotfiles.sh` to continue setting up dotfiles
-    - you can override repo by `DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git`
-- `./destory.sh` to start from scratch
-- `vagrant halt` to shut down the VM
-- `vagrant up` to turn on the VM
+- In ssh, run \`/vagrant/init_dotfiles.sh\` to continue setting up dotfiles
+    - you can override repo by \`DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git\`
+- \`./destory.sh\` to start from scratch
+- \`vagrant halt\` to shut down the VM
+- \`vagrant up\` to turn on the VM
 
 Don't forget to paste the ssh key above to the dotfile repo host like Github
 "
