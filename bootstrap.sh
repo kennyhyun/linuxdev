@@ -2,6 +2,11 @@
 
 set +e
 
+sed="sed"
+if [ $(uname -s) == "Darwin" ]; then
+  sed="gsed"
+fi
+
 echo =================================
 echo Bootstrap vagrant machine
 echo =================================
@@ -52,7 +57,7 @@ $ssh sudo cp -a /home/vagrant/.ssh /root/
 $ssh sudo chown -R root:root /root/.ssh
 
 if [[ -z "$(grep root $SSH_CONFIG.root)" ]]; then
-  sed -e '0,/vagrant/{s/vagrant/root/}' -e '0,/default/{s/default/root/}' $SSH_CONFIG >> $SSH_CONFIG.root
+  $sed -e '0,/vagrant/{s/vagrant/root/}' -e '0,/default/{s/default/root/}' $SSH_CONFIG >> $SSH_CONFIG.root
 fi
 #### user root
 ssh="ssh -F $SSH_CONFIG.root root"
@@ -123,7 +128,7 @@ EOSSH
 echo ---------------------
 if [[ -z $(grep $machine_name ~/.ssh/config) ]]; then
   echo adding ssh config for $machine_name
-  sed -e "0,/vagrant/{s/vagrant/$username/}" -e "0,/default/{s/default/$machine_name/}" $SSH_CONFIG >> ~/.ssh/config
+  $sed -e "0,/vagrant/{s/vagrant/$username/}" -e "0,/default/{s/default/$machine_name/}" $SSH_CONFIG >> ~/.ssh/config
 else
   echo $machine_name entry found in ~/.ssh/config. Please double check if Port is correct:
   grep $machine_name ~/.ssh/config -A10|grep Port
