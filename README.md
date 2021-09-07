@@ -83,8 +83,7 @@ Now you can ssh into Linux dev env
 ssh linuxdev
 ```
 
-Run `init_dotfiles.sh` to continue setting up dotfiles
-In ssh, run `/vagrant/init_dotfiles.sh` 
+Run `/vagrant/init_dotfiles.sh` to continue setting up dotfiles in ssh.
 
 It installs basic devtools from external [dotfiles project](https://github.com/kennyhyun/dotfiles)
 
