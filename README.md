@@ -94,6 +94,7 @@ You can override repo by `DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git`
 
 - `vagrant halt` to shut down the VM
 - `vagrant up` to turn on the VM
+- `vagrant reload` apply .env settings like MEMORY, CPUS
 - `./destory.sh` to destroy the VM and start from scratch
 
 If you want to repeat from scratch for some reason, you can run `./destroy.sh` and retry `bootstrap.sh`.
