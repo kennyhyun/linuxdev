@@ -130,7 +130,7 @@ fi
 #### user $username
 ssh $machine_name << EOSSH
 
-echo "------------------------\nHello from $machine_name, $(whoami)"
+echo "------------------------\nHello from $machine_name, \$(whoami)"
 sudo apt remove vim -y
 sudo apt update && sudo apt install \
 git \
