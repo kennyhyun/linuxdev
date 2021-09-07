@@ -94,14 +94,14 @@ if [ $swapfile ]; then
   if [[ ! -f /swapfile ]]; then
     echo "-----
 Creating swapfile"
-    dd if=/dev/zero of=/swapfile bs=512M count=2 oflag=append conv=notrunc
+    dd if=/dev/zero of=/swapfile bs=1M count=1024 oflag=append conv=notrunc
     chmod 600 /swapfile
     mkswap /swapfile
   fi
   echo "-----
 Adding swapfile"
   sudo swapon /swapfile
-  if [[ -z "$(grep swapfile -w /etc/fstab)" ]]; then
+  if [[ -z "\$(grep swapfile -w /etc/fstab)" ]]; then
     echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
   fi
   mount -a
@@ -112,8 +112,10 @@ free -h
 if [[ ! -f /dummy ]]; then
   echo "-----
 Expanding actual size for ${expand_disk_size}GB"
+  let "blockSize = $expand_disk_size * 1024"
   #fallocate -l ${expand_disk_size}G /dummy
-  dd if=/dev/zero of=/dummy bs=1G count=$expand_disk_size oflag=append conv=notrunc
+  echo DDing \$blockSize x 1M
+  dd if=/dev/zero of=/dummy bs=1M count=\$blockSize oflag=append conv=notrunc
 fi
 
 EOSSH
@@ -130,13 +132,14 @@ fi
 #### user $username
 ssh $machine_name << EOSSH
 
-echo "------------------------\nHello from $machine_name, $(whoami)"
+echo "==============================\nHello from $machine_name, \$(whoami)"
 sudo apt remove vim -y
 sudo apt update && sudo apt install \
 git \
 zsh \
 vim-gtk \
 python3-pip \
+dnsutils \
 -y
 wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
 sh install.sh --unattended
@@ -155,7 +158,7 @@ docker-compose up -d
 docker cp /etc/passwd samba:/etc/passwd
 ./adduser \$USER
 
-if [[ -f ~/.ssh/id_rsa ]]; then
+if [ -f ~/.ssh/id_rsa ]; then
 echo "-----\nssh key aleady exists"
 else
 echo "-----\nGenerating ssh key"
@@ -166,9 +169,10 @@ echo ---------------------
 cat ~/.ssh/id_rsa.pub
 echo ---------------------
 
-if [[ -f /dummy ]]; then
+if [ -f /dummy ]; then
   filesize=\$(stat -c%s "/dummy")
   if (( filesize > 1 )); then
+    echo \$filesize was larger than 1, removing /dummy
     sudo rm /dummy
     sudo touch /dummy
   fi
@@ -179,16 +183,15 @@ echo "
 Congrats!!!
 
 You can now ssh into the machine by
-
-```
+\`\`\`
 ssh $machine_name
-```
+\`\`\`
 
-- In ssh, run `/vagrant/init_dotfiles.sh` to continue setting up dotfiles
-    - you can override repo by `DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git`
-- `./destory.sh` to start from scratch
-- `vagrant halt` to shut down the VM
-- `vagrant up` to turn on the VM
+- In ssh, run \`/vagrant/init_dotfiles.sh\` to continue setting up dotfiles
+    - you can override repo by \`DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git\`
+- \`./destory.sh\` to start from scratch
+- \`vagrant halt\` to shut down the VM
+- \`vagrant up\` to turn on the VM
 
 Don't forget to paste the ssh key above to the dotfile repo host like Github
 "
