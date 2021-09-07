@@ -137,6 +137,7 @@ git \
 zsh \
 vim-gtk \
 python3-pip \
+dnsutils \
 -y
 wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
 sh install.sh --unattended
