@@ -156,7 +156,7 @@ You can create .env to customize. The default values will be used if not exists.
 NAME=awesome-name
 ```
 
-This will rename the machine name in VirtualBox. run `vagrant reload` to apply when udpated.
+This will rename the machine name in VirtualBox. run `vagrant reload` to apply when updated.
 
 ### Cpus and memory
 
@@ -165,7 +165,7 @@ CPUS=4
 MEMORY=8192
 ```
 
-This will adjust cpus and memory, run `vagrant reload` to apply when udpated.
+This will adjust cpus and memory, run `vagrant reload` to apply when updated.
 
 ### Expand disk size :warning:
 
@@ -176,11 +176,11 @@ EXPAND_DISK_GB=10
 It's using 60GB of disk image but it's dynamically allocated.
 It's is great in most case but when the disk space is expanded, the VM performance will be deteriorated.
 
-This will expand the disk during bootstrap along creating swapfile.
+This will expand the disk during bootstrap.
 And you will have some slowness on the VM for a while but would not be slow while using the VM afterwhile.
 
 This should be setup before running bootstrap.
-Or you can retry after removing /swapfile
+Or you can retry after removing `/dummy`
 
 
 ## Additional Goals
