@@ -94,7 +94,7 @@ if [ $swapfile ]; then
   if [[ ! -f /swapfile ]]; then
     echo "-----
 Creating swapfile"
-    dd if=/dev/zero of=/swapfile bs=512M count=2 oflag=append conv=notrunc
+    dd if=/dev/zero of=/swapfile bs=1M count=1024 oflag=append conv=notrunc
     chmod 600 /swapfile
     mkswap /swapfile
   fi
@@ -112,8 +112,10 @@ free -h
 if [[ ! -f /dummy ]]; then
   echo "-----
 Expanding actual size for ${expand_disk_size}GB"
+  let "blockSize = $expand_disk_size * 1024"
   #fallocate -l ${expand_disk_size}G /dummy
-  dd if=/dev/zero of=/dummy bs=1G count=$expand_disk_size oflag=append conv=notrunc
+  echo DDing \$blockSize x 1M
+  dd if=/dev/zero of=/dummy bs=1M count=\$blockSize oflag=append conv=notrunc
 fi
 
 EOSSH
