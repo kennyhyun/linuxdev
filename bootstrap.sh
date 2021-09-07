@@ -101,7 +101,7 @@ Creating swapfile"
   echo "-----
 Adding swapfile"
   sudo swapon /swapfile
-  if [[ -z "$(grep swapfile -w /etc/fstab)" ]]; then
+  if [[ -z "\$(grep swapfile -w /etc/fstab)" ]]; then
     echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
   fi
   mount -a
@@ -172,7 +172,7 @@ echo ---------------------
 if [ -f /dummy ]; then
   filesize=\$(stat -c%s "/dummy")
   if (( filesize > 1 )); then
-    echo \$filesize was larger than 1
+    echo \$filesize was larger than 1, removing /dummy
     sudo rm /dummy
     sudo touch /dummy
   fi
