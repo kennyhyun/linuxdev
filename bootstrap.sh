@@ -19,10 +19,10 @@ swapfile=${SWAPFILE:-}
 # get username from env or prompt
 username=$VAGRANT_USERNAME
 if [ -z "$VAGRANT_USERNAME" ]; then
-echo -n "> Please enter default vagrant user name [vagrant]:"
-read input
-username=${input:-vagrant}
-echo "VAGRANT_USERNAME=$username">> .env
+  echo -n "> Please enter default vagrant user name [vagrant]:"
+  read input
+  username=${input:-vagrant}
+  echo "VAGRANT_USERNAME=$username">> .env
 fi
 
 machine_name=${NAME:-linuxdev}
@@ -34,7 +34,7 @@ vagrant up
 # create ssh config file
 SSH_CONFIG="./ssh.config"
 if [ -z "$(grep vagrant $SSH_CONFIG)" ]; then
-vagrant ssh-config >> $SSH_CONFIG
+  vagrant ssh-config >> $SSH_CONFIG
 fi
 
 # create user with UID 1000
@@ -64,7 +64,7 @@ ssh="ssh -F $SSH_CONFIG.root root"
 
 
 if [[ -z "$exists" ]]; then
-echo "user $username not found"
+  echo "user $username not found"
   $ssh << EOSSH
 echo ---------------------
 echo "creating $username"
@@ -82,7 +82,7 @@ if [ ! -d "/home/$username/.ssh" ]; then
 fi
 grep $username /etc/passwd
 EOSSH
-echo ---------------------
+  echo ---------------------
 fi
 
 # Adding $username to Sudoer 
@@ -146,13 +146,28 @@ vim-gtk \
 python3-pip \
 dnsutils \
 -y
-wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
-sh install.sh --unattended
-rm -f install.sh*
-sudo chsh -s /bin/zsh $username
-echo "-----\nInstalling docker-compose...."
-sudo apt install docker-compose -y
+
+if [ -f ~/.oh-my-zsh/oh-my-zsh.sh ]; then
+  echo "-----\noh my zsh is aleady installed"
+else
+  echo "-----\nInstalling oh my zsh...."
+  wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
+  sh install.sh --unattended
+  rm -f install.sh*
+  sudo chsh -s /bin/zsh $username
+fi
+
+if [ -f /usr/local/bin/docker-compose ]; then
+  echo "-----\ndocker-compose aleady exists"
+else
+  echo "-----\nInstalling docker-compose...."
+  docker_compose_url=https://github.com\$(wget -q -O - https://github.com/docker/compose/releases/latest | sed -n 's/.*href="\([^"]*\).*/\1/p'|grep "\$(uname -s)-\$(uname -m)$")
+  echo docker_compose_url: \$docker_compose_url
+  sudo wget \$docker_compose_url -O /usr/local/bin/docker-compose
+  sudo chmod +x /usr/local/bin/docker-compose
+fi
 docker-compose --version
+
 echo "-----\nConfiguring samba"
 mkdir -p ~/Projects
 mkdir -p samba
@@ -165,10 +180,10 @@ chmod +x adduser
 ./adduser \$USER
 
 if [ -f ~/.ssh/id_rsa ]; then
-echo "-----\nssh key aleady exists"
+  echo "-----\nssh key aleady exists"
 else
-echo "-----\nGenerating ssh key"
-ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ""
+  echo "-----\nGenerating ssh key"
+  ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ""
 fi
 echo "Paste the public key below into Github or else"
 echo ---------------------
