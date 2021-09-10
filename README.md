@@ -114,7 +114,7 @@ If you want to repeat from scratch for some reason, you can run `./destroy.sh` a
 Docker tend to use many small files especially for node.js
 
 If the main storage has not enough inodes, docker can fail because of the disk space.
-You can check that `df -h` has some free space but `df -hi` could show a low free space.
+You can check that `df -h` has some free space but `df -hi` shows a low free space.
 
 BTW, You can prune unused file by following docker command but it would rebuild required files soon.
 
