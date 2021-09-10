@@ -98,6 +98,32 @@ You can override repo by `DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git`
 
 If you want to repeat from scratch for some reason, you can run `./destroy.sh` and retry `bootstrap.sh`.
 
+## Packages covered by bootstrap
+
+- docker (installed by vagrant provision)
+- docker-compose
+- python3-pip
+- git
+- zsh
+- oh-my-zsh
+- vim-gtk (for vim-python3)
+- dnsutils
+
+## docker storage
+
+Docker tend to use many small files especially for node.js
+
+If the main storage has not enough inodes, docker can fail because of the disk space.
+You can check that `df -h` has some free space but `df -hi` could show a low free space.
+
+BTW, You can prune unused file by following docker command but it would rebuild required files soon.
+
+```sh
+docker system prune --volumes
+```
+
+This vgrantfile has additional space file of 40GB and it can be configured by `DOCKER_DISK_SIZE_GB=40`
+
 ## Details For Windows 10 users
 
 <details>
