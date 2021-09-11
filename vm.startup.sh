@@ -24,7 +24,7 @@ EOF
 
 ## format
 		size_gb=$(echo $line|grep -o "[0-9.]\+ GiB"|grep -o "[0-9.]\+")
-		inode_ratio=2048
+		inode_ratio=1024
 		inode_count_1000=$(echo |awk "{ print $size_gb * 1024 * 1024 / $inode_ratio }"|grep -o "[0-9]\+")
 		echo "===================="
 		echo Created $partition, trying to format ext4 with $inode_ratio block and ${inode_count_1000}000 inodes

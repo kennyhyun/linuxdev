@@ -2,7 +2,7 @@
 
 set -e
 
-cd ~/.certs
+cd ~/certs
 
 sudo service docker stop
 

@@ -8,7 +8,7 @@ common_name=$local_ip_addr
 passphrase=pass:passwd
 
 mkdir -p ~/certs
-cd ~/.certs
+cd ~/certs
 
 # generate CA private and public keys
 openssl genrsa -aes256 -out ca-key.pem -passout $passphrase 4096
