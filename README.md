@@ -98,6 +98,16 @@ You can override repo by `DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git`
 
 If you want to repeat from scratch for some reason, you can run `./destroy.sh` and retry `bootstrap.sh`.
 
+## Packages covered by setup (host)
+
+- vagrant
+- virtualbox
+- vscode
+- git
+- Windows Terminal (Windows)
+- iterm2 (Mac)
+- gnu-sed (Mac)
+
 ## Packages covered by bootstrap
 
 - docker (installed by vagrant provision)
