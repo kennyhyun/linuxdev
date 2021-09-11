@@ -231,9 +231,10 @@ export DOCKER_TLS_VERIFY=1
 touch ~/.bash_profile
 fi
 if [ "$windows" ] && ! [ -f ~/docker_env.bat ]; then
-  echo "setx DOCKER_CERT_PATH=%userprofile%\.docker\certs.$machine_name
-setx DOCKER_HOST=192.168.99.123
-setx DOCKER_TLS_VERIFY=1
+  echo "@echo off
+set DOCKER_CERT_PATH=%userprofile%\.docker\certs.$machine_name
+set DOCKER_HOST=192.168.99.123
+set DOCKER_TLS_VERIFY=1
 " > ~/docker_env.bat
 fi
 
