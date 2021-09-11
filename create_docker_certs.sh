@@ -1,11 +1,20 @@
 #!/bin/bash
 
+set -e
+
+if [ "$(uname -s)" != "Linux]; then
+  exit -1
+fi
+
 # https://docs.docker.com/engine/security/protect-access/
 
 local_ip_addr=192.168.99.123
 common_name=$local_ip_addr
 
 passphrase=pass:passwd
+
+mkdir -p ~/linuxdev.certs
+cd ~/linuxdev.certs
 
 # generate CA private and public keys
 openssl genrsa -aes256 -out ca-key.pem -passout $passphrase 4096

@@ -2,8 +2,15 @@
 
 set -e
 
+if [ "$(uname -s)" != "Linux]; then
+  exit -1
+fi
+
+cd ~/linuxdev.certs
+
 sudo service docker stop
 
+sudo mkdir -p /etc/systemd/system/docker.service.d/
 sudo bash -c 'echo "[Service]
 ExecStart=
 ExecStart=/usr/bin/dockerd --tls=true --tlscacert=/var/docker/ca.pem --tlscert=/var/docker/server-cert.pem --tlskey=/var/docker/server-key.pem -H fd:// -H tcp://0.0.0.0:2376 --containerd=/run/containerd/containerd.sock

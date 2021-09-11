@@ -89,14 +89,63 @@ It installs basic devtools from external [dotfiles project](https://github.com/k
 
 You can override repo by `DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git`
 
+### Demo
+
+`setup.ps1` (Windows Powershell script; Use setup.sh for Mac)
+
+[![asciicast](https://asciinema.org/a/IqGHfToxLcfSwSJRoBIHZBoWY.svg)](https://asciinema.org/a/IqGHfToxLcfSwSJRoBIHZBoWY)
+
+`bootstrap.sh` (Mac; You can also use it in Git bash in Windows Terminal)
+
+[![asciicast](https://asciinema.org/a/o7HNUExImgO6gCKjlUTczwK7G.svg)](https://asciinema.org/a/o7HNUExImgO6gCKjlUTczwK7G)
+
+
 ### Commands after setup
 
 - `vagrant halt` to shut down the VM
 - `vagrant up` to turn on the VM
-- `vagrant reload` apply .env settings like MEMORY, CPUS
+- `vagrant reload` apply .env settings like MEMORY, CPUS with **rebooting vm**
 - `./destory.sh` to destroy the VM and start from scratch
 
 If you want to repeat from scratch for some reason, you can run `./destroy.sh` and retry `bootstrap.sh`.
+
+## Packages covered by setup (host)
+
+- vagrant
+- virtualbox
+- vscode
+- git
+- Windows Terminal (Windows)
+- iterm2 (Mac)
+- gnu-sed (Mac)
+
+[Vagrant Manager](https://www.vagrantmanager.com/) would be nice to have. 
+
+## Packages covered by bootstrap
+
+- docker (installed by vagrant provision)
+- docker-compose
+- python3-pip
+- git
+- zsh
+- oh-my-zsh
+- vim-gtk (for vim-python3)
+- dnsutils
+
+## docker storage
+
+Docker tend to use many small files especially for node.js
+
+If the main storage has not enough inodes, docker can fail because of the disk space.
+You can check that `df -h` has some free space but `df -hi` shows a low free space.
+
+BTW, You can prune unused file by following docker command but it would rebuild required files soon.
+
+```sh
+docker system prune --volumes
+```
+
+This vgrantfile has additional space file of 40GB and it can be configured by `DOCKER_DISK_SIZE_GB=40`
 
 ## Details For Windows 10 users
 
@@ -181,6 +230,24 @@ And you will have some slowness on the VM for a while but would not be slow whil
 
 This should be setup before running bootstrap.
 Or you can retry after removing `/dummy`
+
+### Docker lib disk
+
+```
+DOCKER_DISK_SIZE_GB=45
+```
+
+This creates a dedicated docker disk and mount to `/var/lib/docker`
+
+This uses a **Fixed** size disk image for the performance, so please check the free space before setting this.
+There is a startup script to check empty disk partition and format to utilise as a docker disk.
+If you want to change the size, shutdown the VM and remove the image and delete existing, and change this and start the VM. Please note any data in the container **will be gone** with the previous disk image.
+
+Please note that creating a fixed size image can take a few minutes, but maybe longer in Mac (like an hour). Please be patience.
+
+This has no default value so it uses the dynamic sized system disk image (maximum 60GB).
+
+If you had some data left in the system disk docker libs, you can see that by 1. stop docker, 2. unmounting /var/lib/docker, 3. start docker again. You can also delete that after unmounting if you don't need that any more. 
 
 
 ## Additional Goals
