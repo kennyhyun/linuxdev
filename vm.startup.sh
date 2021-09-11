@@ -43,11 +43,13 @@ EOF
 			mkdir -p /mnt/$partition_name/var/lib/docker
 			echo "/mnt/$partition_name/var/lib/docker /var/lib/docker ext4 bind,defaults,nofail 0 2 # by linuxdev startup script" >> /etc/fstab
 			echo Added docker lib directory to /etc/fstab
+			service docker stop
 			mount -a
-			service docker restart
+			service docker start
 		else
 			echo $partition found on /etc/fstab. skipping to add
 		fi
+		break
 	fi
 done <<< "$disks"
 
