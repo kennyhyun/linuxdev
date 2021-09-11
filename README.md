@@ -89,6 +89,17 @@ It installs basic devtools from external [dotfiles project](https://github.com/k
 
 You can override repo by `DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git`
 
+### Demo
+
+`setup.ps1` (Windows Powershell script; Use setup.sh for Mac)
+
+[![asciicast](https://asciinema.org/a/IqGHfToxLcfSwSJRoBIHZBoWY.svg)](https://asciinema.org/a/IqGHfToxLcfSwSJRoBIHZBoWY)
+
+`bootstrap.sh` (Mac; You can also use it in Git bash in Windows Terminal)
+
+[![asciicast](https://asciinema.org/a/o7HNUExImgO6gCKjlUTczwK7G.svg)](https://asciinema.org/a/o7HNUExImgO6gCKjlUTczwK7G)
+
+
 ### Commands after setup
 
 - `vagrant halt` to shut down the VM
