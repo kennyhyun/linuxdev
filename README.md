@@ -247,6 +247,8 @@ Please note that creating a fixed size image can take a few minutes, but maybe l
 
 This has no default value so it uses the dynamic sized system disk image (maximum 60GB).
 
+If you had some data left in the system disk docker libs, you can see that by 1. stop docker, 2. unmounting /var/lib/docker, 3. start docker again. You can also delete that after unmounting if you don't need that any more. 
+
 
 ## Additional Goals
 
