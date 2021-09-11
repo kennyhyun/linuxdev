@@ -7,6 +7,9 @@ common_name=$local_ip_addr
 
 passphrase=pass:passwd
 
+mkdir -p ~/certs
+cd ~/.certs
+
 # generate CA private and public keys
 openssl genrsa -aes256 -out ca-key.pem -passout $passphrase 4096
 openssl req -new -x509 -days 365 -key ca-key.pem -sha256 -out ca.pem -passin $passphrase -subj "/C=AU/ST=NSW/L=Sydney/O=Linuxdev/CN=$common_name"

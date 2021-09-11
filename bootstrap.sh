@@ -3,8 +3,11 @@
 set +e
 
 sed="sed"
+windows=
 if [ $(uname -s) == "Darwin" ]; then
   sed="gsed"
+else
+  windows=1
 fi
 
 echo =================================
@@ -46,37 +49,37 @@ vagrant_uid=$($ssh id -u vagrant 2>/dev/null)
 
 set -e
 
-if [[ $vagrant_uid == 1000 || ($exists != "" && $exists != 1000) ]]; then
+if [ $vagrant_uid == 1000 ] || [ "$exists" != "" && "$exists" != 1000 ]; then
   echo switching is required, remove $username and try again
 fi
-if [[ -z "$vagrant_uid" ]]; then
+if [ -z "$vagrant_uid" ]; then
   echo ssh connection looks like failed
   exit -1;
 fi
 $ssh sudo cp -a /home/vagrant/.ssh /root/
 $ssh sudo chown -R root:root /root/.ssh
 
-if [[ -z "$(grep root $SSH_CONFIG.root)" ]]; then
+if [ -z "$(grep root $SSH_CONFIG.root)" ]; then
   $sed -e '0,/vagrant/{s/vagrant/root/}' -e '0,/default/{s/default/root/}' $SSH_CONFIG >> $SSH_CONFIG.root
 fi
 #### user root
 ssh="ssh -F $SSH_CONFIG.root root"
 
 
-if [[ -z "$exists" ]]; then
+if [ -z "$exists" ]; then
   echo "user $username not found"
   $ssh << EOSSH
 echo ---------------------
 echo "creating $username"
 vagrant_uid=\$(id -u vagrant)
-if [[ \$vagrant_uid == 1000 ]]; then
+if [ \$vagrant_uid == 1000 ]; then
   pkill -U 1000
   usermod -u 1002 vagrant
   groupmod -g 1002 vagrant
 fi
 chown -R vagrant:vagrant /home/vagrant
 useradd $username -u 1000 --create-home
-if [ ! -d "/home/$username/.ssh" ]; then
+if ! [ -d "/home/$username/.ssh" ]; then
   cp -a /home/vagrant/.ssh /home/$username/
   chown -R $username:$username /home/$username/.ssh
 fi
@@ -96,7 +99,7 @@ usermod -aG docker $username
 
 if [ $swapfile ]; then
   echo Found SWAPFILE config
-  if [[ ! -f /swapfile ]]; then
+  if ! [ -f /swapfile ]; then
     echo "-----
 Creating swapfile"
     dd if=/dev/zero of=/swapfile bs=1M count=1024 oflag=append conv=notrunc
@@ -106,7 +109,7 @@ Creating swapfile"
   echo "-----
 Adding swapfile"
   sudo swapon /swapfile
-  if [[ -z "\$(grep swapfile -w /etc/fstab)" ]]; then
+  if [ -z "\$(grep swapfile -w /etc/fstab)" ]; then
     echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
   fi
   mount -a
@@ -114,7 +117,7 @@ fi
 swapon --show
 free -h
 
-if [[ ! -f /dummy ]]; then
+if ! [ -f /dummy ]; then
   echo "-----
 Expanding actual size for ${expand_disk_size}GB"
   let "blockSize = $expand_disk_size * 1024"
@@ -123,11 +126,23 @@ Expanding actual size for ${expand_disk_size}GB"
   dd if=/dev/zero of=/dummy bs=1M count=\$blockSize oflag=append conv=notrunc
 fi
 
+if [ -z "\$(crontab -l|grep "${machine_name}.startup.sh")" ]; then
+  echo "-----
+Adding startup script to crontab"
+  cp /vagrant/vm.startup.sh /root/${machine_name}.startup.sh && \
+  chmod +x /root/${machine_name}.startup.sh && \
+  crontab -l | { cat; echo "@reboot /root/${machine_name}.startup.sh"; } | crontab -
+else
+  echo "-----
+crontab scripts:"
+fi
+  crontab -l
+
 EOSSH
 
 echo ---------------------
-if [[ -z $(grep $machine_name ~/.ssh/config) ]]; then
-  echo adding ssh config for $machine_name
+if [ -z "$(grep $machine_name ~/.ssh/config)" ]; then
+  echo Adding ssh config for $machine_name
   $sed -e "0,/vagrant/{s/vagrant/$username/}" -e "0,/default/{s/default/$machine_name/}" $SSH_CONFIG >> ~/.ssh/config
 else
   echo $machine_name entry found in ~/.ssh/config. Please double check if Port is correct:
@@ -145,6 +160,7 @@ zsh \
 vim-gtk \
 python3-pip \
 dnsutils \
+pass gnupg2 \
 -y
 
 if [ -f ~/.oh-my-zsh/oh-my-zsh.sh ]; then
@@ -165,6 +181,7 @@ else
   echo docker_compose_url: \$docker_compose_url
   sudo wget \$docker_compose_url -O /usr/local/bin/docker-compose
   sudo chmod +x /usr/local/bin/docker-compose
+  sudo pip3 install requests --upgrade
 fi
 docker-compose --version
 
@@ -192,7 +209,7 @@ echo ---------------------
 
 if [ -f /dummy ]; then
   filesize=\$(stat -c%s "/dummy")
-  if (( filesize > 1 )); then
+  if [ "\$filesize" ] && [ "\$filesize" != "0" ]; then
     echo \$filesize was larger than 1, removing /dummy
     sudo rm /dummy
     sudo touch /dummy
@@ -200,7 +217,28 @@ if [ -f /dummy ]; then
 fi
 EOSSH
 
-echo "
+if ! [ -d ~/.docker/certs.$machine_name ]; then
+  echo "--------
+Creating Docker certs"
+  ssh $machine_name /vagrant/create_docker_certs.sh
+  mkdir -p ~/.docker/certs.$machine_name
+  cp ./certs/*.pem ~/.docker/certs.$machine_name/
+  ssh $machine_name /vagrant/config_docker_certs.sh
+  echo "export DOCKER_CERT_PATH=~/.docker/certs.$machine_name
+export DOCKER_HOST=192.168.99.123
+export DOCKER_TLS_VERIFY=1
+" >> ~/.bashrc
+touch ~/.bash_profile
+fi
+if [ "$windows" ] && ! [ -f ~/docker_env.bat ]; then
+  echo "setx DOCKER_CERT_PATH=%userprofile%\.docker\certs.$machine_name
+setx DOCKER_HOST=192.168.99.123
+setx DOCKER_TLS_VERIFY=1
+" > ~/docker_env.bat
+fi
+
+echo "----------------------
+
 Congrats!!!
 
 You can now ssh into the machine by

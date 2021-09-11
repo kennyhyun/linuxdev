@@ -65,11 +65,19 @@ Vagrant.configure("2") do |config|
   #
   # View the documentation for the provider you are using for more
   # information on available options.
+  machine_name = ENV['NAME'] || "linuxdev"
   config.vm.provider "virtualbox" do |vb|
-    vb.name = ENV['NAME'] || "linuxdev"
+    vb.name = machine_name
     vb.gui = false
     vb.memory = ENV['MEMORY'] || 1024
     vb.cpus = ENV['CPUS'] || 2
+
+    docker_disk_size = ENV['DOCKER_DISK_SIZE_GB']
+    disk_filename = "./docker.#{docker_disk_size}.vdi"
+    if docker_disk_size && !File.exist?(disk_filename)
+      vb.customize ['createhd', '--filename', disk_filename, '--variant', 'Fixed', '--size', docker_disk_size.to_i * 1024]
+      vb.customize ['storageattach', :id,  '--storagectl', 'SATA Controller', '--port', 1, '--type', 'hdd', '--medium', disk_filename]
+    end
   end
 
   # Enable provisioning with a shell script. Additional provisioners such as
@@ -81,5 +89,5 @@ Vagrant.configure("2") do |config|
   # SHELL
   #config.vm.provision "file", source: "./.vagrant/machines/default/virtualbox/private_key", destination: "$HOME/.ssh/id_rsa"
   config.vm.provision "docker",
-    images: ["stanback/alpine-samba"]
+    images: ["stanback/alpine-samba", "docker/dockerfile:1.0-experimental"]
 end
