@@ -2,6 +2,13 @@
 
 # find empty disk
 
+set -e
+
+PATH=/usr/sbin:/usr/bin:$PATH
+
+if [ "$(uname -s)" != Linux ]; then
+  exit -1
+fi
 
 disks=$(fdisk -l |grep -o "^Disk /dev/.d.: [0-9.]\+ GiB")
 

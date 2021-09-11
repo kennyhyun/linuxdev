@@ -2,6 +2,10 @@
 
 set -e
 
+if [ "$(uname -s)" != "Linux]; then
+  exit -1
+fi
+
 cd ~/linuxdev.certs
 
 sudo service docker stop

@@ -2,6 +2,10 @@
 
 set -e
 
+if [ "$(uname -s)" != "Linux]; then
+  exit -1
+fi
+
 # https://docs.docker.com/engine/security/protect-access/
 
 local_ip_addr=192.168.99.123
