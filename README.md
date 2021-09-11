@@ -119,6 +119,8 @@ If you want to repeat from scratch for some reason, you can run `./destroy.sh` a
 - iterm2 (Mac)
 - gnu-sed (Mac)
 
+[Vagrant Manager](https://www.vagrantmanager.com/) would be nice to have. 
+
 ## Packages covered by bootstrap
 
 - docker (installed by vagrant provision)
