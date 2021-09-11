@@ -14,8 +14,6 @@ disks=$(fdisk -l |grep -o "^Disk /dev/.d.: [0-9.]\+ GiB")
 
 while IFS= read -r line
 do
-	echo ----- loop for $line
-
 	disk=$(echo $line|grep -o /dev/.d.)
 ## partition
 	echo "======= $line ======="
