@@ -57,7 +57,7 @@ sudo cp ca.pem /var/docker/
 echo Copied server certs to /var/docker/
 
 # copy client certs to host
-rm /vagrant/certs/*.pem
+rm -f /vagrant/certs/*.pem
 cp ca.pem /vagrant/certs/
 cp cert.pem /vagrant/certs/
 cp key.pem /vagrant/certs/
