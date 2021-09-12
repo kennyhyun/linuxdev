@@ -109,6 +109,10 @@ You can override repo by `DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git`
 
 If you want to repeat from scratch for some reason, you can run `./destroy.sh` and retry `bootstrap.sh`.
 
+docker is available and you will see the samba container running for the VM
+
+Please use install-docker-clients script if you don't have docker clients installed.
+
 ## Packages covered by setup (host)
 
 - vagrant
