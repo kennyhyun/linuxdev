@@ -6,7 +6,7 @@ set -e
 
 PATH=/usr/sbin:/usr/bin:$PATH
 
-if [ "$(uname -s)" != Linux ]; then
+if [ "$(uname -s)" != "Linux" ]; then
   exit -1
 fi
 
