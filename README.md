@@ -2,7 +2,7 @@
 
 Boot up Linux development env using Vagrant
 
-**:warning: This repo is still in development** 
+**:warning: This repo is still in development**, but please feel free to try!
 
 
 ## Why?
@@ -156,7 +156,7 @@ This vgrantfile has additional space file of 40GB and it can be configured by `D
 
 > :warning: **Note that this script will disable WSL2(Hyper-V).**
 >
-> Please backup any required files before running.
+> Please backup any required files before running. Docker will be still available by this VM
 
 Right click windows menu and click Windows Powershell (Admin)
 
