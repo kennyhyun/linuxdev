@@ -49,7 +49,7 @@ vagrant_uid=$($ssh id -u vagrant 2>/dev/null)
 
 set -e
 
-if [ $vagrant_uid == 1000 ] || [ "$exists" != "" && "$exists" != 1000 ]; then
+if [ "$vagrant_uid" == "1000" ] || ([ "$exists" != "" ] && [ "$exists" != "1000" ]); then
   echo switching is required, remove $username and try again
 fi
 if [ -z "$vagrant_uid" ]; then
@@ -62,6 +62,7 @@ $ssh sudo chown -R root:root /root/.ssh
 if [ -z "$(grep root $SSH_CONFIG.root)" ]; then
   $sed -e '0,/vagrant/{s/vagrant/root/}' -e '0,/default/{s/default/root/}' $SSH_CONFIG >> $SSH_CONFIG.root
 fi
+
 #### user root
 ssh="ssh -F $SSH_CONFIG.root root"
 
@@ -220,6 +221,7 @@ EOSSH
 if ! [ -d ~/.docker/certs.$machine_name ]; then
   echo "--------
 Creating Docker certs"
+  ssh $machine_name mv linuxdev.certs linuxdev.certs.backup || echo ""
   ssh $machine_name /vagrant/create_docker_certs.sh
   mkdir -p ~/.docker/certs.$machine_name
   cp ./certs/*.pem ~/.docker/certs.$machine_name/
@@ -229,6 +231,8 @@ export DOCKER_HOST=192.168.99.123
 export DOCKER_TLS_VERIFY=1
 " >> ~/.bashrc
 touch ~/.bash_profile
+else
+  echo "~/.docker/certs.$machine_name already exists, skip creating Docker certs"
 fi
 if [ "$windows" ] && ! [ -f ~/docker_env.bat ]; then
   echo "@echo off

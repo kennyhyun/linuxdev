@@ -2,7 +2,7 @@
 
 set -e
 
-if [ "$(uname -s)" != "Linux]; then
+if [ "$(uname -s)" != "Linux" ]; then
   exit -1
 fi
 
@@ -57,6 +57,7 @@ sudo cp ca.pem /var/docker/
 echo Copied server certs to /var/docker/
 
 # copy client certs to host
+rm -f /vagrant/certs/*.pem
 cp ca.pem /vagrant/certs/
 cp cert.pem /vagrant/certs/
 cp key.pem /vagrant/certs/
