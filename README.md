@@ -253,15 +253,18 @@ This has no default value so it uses the dynamic sized system disk image (maximu
 
 If you had some data left in the system disk docker libs, you can see that by 1. stop docker, 2. unmounting /var/lib/docker, 3. start docker again. You can also delete that after unmounting if you don't need that any more. 
 
+## Installing and using docker clients
+
+This vm provides docker connection in 5 port.
+If you have docker client and set the env vars you can use docker from the host like Docker Desktop.
+
+if you don't have installed docker or docker-compose, you can install by running install-docker-clients script.
+
+`.bashrc` has DOCKER_HOST and required variables for Mac/Git-bash and `docker_env.bat` in the users directory will set variables in the command terminal in Windows.
 
 ## Additional Goals
 
-- Docker support for the host
-  - create docker certificates
-  - install docker tools for the host
-    - docker-cli
-    - docker-compose
-
+- Share virtualbox env across Bootcamp
 
 ## License
 
