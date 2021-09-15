@@ -231,7 +231,10 @@ export DOCKER_HOST=tcp://192.168.99.123:2376
 export DOCKER_TLS_VERIFY=1
 export COMPOSE_CONVERT_WINDOWS_PATHS=1
 " >> ~/.bashrc
-touch ~/.bash_profile
+  touch ~/.bash_profile
+  if [ -z "$(grep bashrc ~/.bash_profile)" ]; then
+    echo "test -f ~/.bashrc && source ~/.bashrc" >> ~/.bash_profile
+  fi
 else
   echo "~/.docker/certs.$machine_name already exists, skip creating Docker certs"
 fi
