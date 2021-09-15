@@ -6,7 +6,7 @@ if [ "$(uname -s)" != "Linux" ]; then
   exit -1
 fi
 
-DOCKER_PORT=2375
+DOCKER_PORT=2376
 
 cd ~/linuxdev.certs
 
