@@ -234,12 +234,13 @@ touch ~/.bash_profile
 else
   echo "~/.docker/certs.$machine_name already exists, skip creating Docker certs"
 fi
-if [ "$windows" ] && ! [ -f ~/docker_env.bat ]; then
+mkdir -p ~/Programs
+if [ "$windows" ] && ! [ -f ~/Programs/docker_env.bat ]; then
   echo "@echo off
 set DOCKER_CERT_PATH=%userprofile%\.docker\certs.$machine_name
 set DOCKER_HOST=192.168.99.123
 set DOCKER_TLS_VERIFY=1
-" > ~/docker_env.bat
+" > ~/Programs/docker_env.bat
 fi
 
 echo "----------------------
