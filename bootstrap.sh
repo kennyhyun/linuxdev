@@ -242,6 +242,7 @@ else
 fi
 mkdir -p ~/Programs
 if [ "$windows" ] && ! [ -f ~/Programs/docker_env.bat ]; then
+  powershell ./add-programs-to-path.ps1
   echo "@echo off
 set DOCKER_CERT_PATH=%userprofile%\.docker\certs.$machine_name
 set DOCKER_HOST=tcp://$ip_arress:$docker_port
@@ -251,7 +252,7 @@ set COMPOSE_CONVERT_WINDOWS_PATHS=1
   setx DOCKER_CERT_PATH %userprofile%\.docker\certs.$machine_name
   setx DOCKER_HOST tcp://$ip_arress:$docker_port
   setx DOCKER_TLS_VERIFY 1
-  setx COMPOSE_CONVERT_WINDOWS_PATHS=1
+  setx COMPOSE_CONVERT_WINDOWS_PATHS 1
 fi
 
 echo "----------------------
