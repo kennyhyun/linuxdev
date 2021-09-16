@@ -66,6 +66,8 @@ fi
 #### user root
 ssh="ssh -F $SSH_CONFIG.root root"
 
+docker_port=${DOCKER_PORT:-2376}
+ip_address=${IP_ADDRESS:-192.168.99.123}
 
 if [ -z "$exists" ]; then
   echo "user $username not found"
@@ -227,19 +229,29 @@ Creating Docker certs"
   cp ./certs/*.pem ~/.docker/certs.$machine_name/
   ssh $machine_name /vagrant/config_docker_certs.sh
   echo "export DOCKER_CERT_PATH=~/.docker/certs.$machine_name
-export DOCKER_HOST=192.168.99.123
+export DOCKER_HOST=tcp://$ip_address:$docker_port
 export DOCKER_TLS_VERIFY=1
+export COMPOSE_CONVERT_WINDOWS_PATHS=1
 " >> ~/.bashrc
-touch ~/.bash_profile
+  touch ~/.bash_profile
+  if [ -z "$(grep bashrc ~/.bash_profile)" ]; then
+    echo "test -f ~/.bashrc && source ~/.bashrc" >> ~/.bash_profile
+  fi
 else
   echo "~/.docker/certs.$machine_name already exists, skip creating Docker certs"
 fi
-if [ "$windows" ] && ! [ -f ~/docker_env.bat ]; then
+mkdir -p ~/Programs
+if [ "$windows" ] && ! [ -f ~/Programs/docker_env.bat ]; then
   echo "@echo off
 set DOCKER_CERT_PATH=%userprofile%\.docker\certs.$machine_name
-set DOCKER_HOST=192.168.99.123
+set DOCKER_HOST=tcp://$ip_arress:$docker_port
 set DOCKER_TLS_VERIFY=1
-" > ~/docker_env.bat
+set COMPOSE_CONVERT_WINDOWS_PATHS=1
+" > ~/Programs/docker_env.bat
+  setx DOCKER_CERT_PATH %userprofile%\.docker\certs.$machine_name
+  setx DOCKER_HOST tcp://$ip_arress:$docker_port
+  setx DOCKER_TLS_VERIFY 1
+  setx COMPOSE_CONVERT_WINDOWS_PATHS=1
 fi
 
 echo "----------------------
