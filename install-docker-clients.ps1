@@ -1,5 +1,6 @@
 $ErrorActionPreference = "Stop"
 
+$PROGRAMS_DIR="$HOME\Programs"
 invoke-expression -Command $PSScriptRoot\add-programs-to-path.ps1
 
 ######################
