@@ -2,47 +2,78 @@
 
 Boot up Linux development env using Vagrant
 
-**:warning: This repo is still in development**, but please feel free to try!
+|  | Docker Desktop  | Linuxdev with Vagrant |
+|--|------|------|
+|Docker hub account	|<sub>signin is required if you want to stop checking updates</sub>	|<sub>:heavy_check_mark:**login to Docker hub is not necessary**</sub>|
+|Control over the Docker Engine Version	|<sub>Should use latest above v3, unless the user ignore the updates</sub>|<sub>:heavy_check_mark:**have the controll for docker-ce (community edition)**</sub>|
+|Licensing	|<sub>free for small business and personal, but auto-checking-update</sub>|<sub>:heavy_check_mark:**free of charge (w/o VB extension pack)**</sub>|
+|Network setup	|<sub>Host network	</sub>|<sub>:heavy_check_mark:**Can Choose <br>. Bridge(host) <br>. NAT + Host-only**</sub>|
+|Performance	|<sub>. Hyper-v VM; might be slightly better but it likely consumes more memory</sub>|<sub>. Virtualbox VM; not so bad<br>. Has alternatives (Hyper-v/VMWare/Virtualbox)</sub>|
+|Environment	|<sub>Slightly different environment between<br>. Windows WSL2 (Custom distro integration required for Docker host access)<br>. Windows VM (w/o Docker host acess)<br>. Mac VM (w/o Docker host acess)</sub>|<sub>:heavy_check_mark:**Common Linux environment available in Mac/Windows<br>. Full Linux VM will be provided as a Docker host<br>  (Files can be shared natively in Linux host)<br>. Docker engine can be also accessed from the host OS<br>  (docker and docker-compose client installation required)**</sub>|
+|Installation	|<sub>Installer provided</sub>|<sub>Install scripts provided</sub>|
+|Starting Docker	|<sub>:heavy_check_mark:**Autostart configurable**</sub>|<sub>Manually by Vagrant Manager or cli<br>Startup script should be configurable</sub>|
+|Clients	|<sub>Provided along with the Docker Desktop installer</sub>|<sub>Install scripts provided</sub>|
+|Config	|<sub>:heavy_check_mark:**Configurable in GUI**</sub>|<sub>Configurable in script</sub>|
+|Docker storage	|<sub>Configurable size</sub>|<sub>:heavy_check_mark:**Configurable 2k block size with a lot of inodes**</sub>|
+|Logs/status	|<sub>:heavy_check_mark:**GUI provided**</sub>|<sub>Only available in CLI</sub>|
+|Limiting memory usuage	|<sub>.wslconfig file for WSL2/GUI for VM</sub>|<sub>.env file/VirtualBox GUI</sub>|
 
 
 ## Why?
 
 Docker is necessary for developing nowadays. But if you are not using Linux as the OS, it requires VM for Docker engine.
 
-I was using Linux in Virtualbox for many years and found that was quite nice and had no problem for using docker in it.
+I was using Linux in Virtualbox for many years and found that was quite nice and had no problem for using docker in it. And personally satisfied with the performance of docker in VM
 In the other hand, Docker Desktop, I found couple of issue with using Docker Desktop in Windows recently.
 
-### Docker Desktop vs VM
+<details>
+<summary>What I didn't like about WSL/Docker Desktop</summary>
+    
+- Memory usage is keep growing upto VM memory limitation
+- some file was missing for binding into docker
+- Additional settings to ssh in to the linux
+- ssh connection env was a bit different (not sure) when used in terminal
+- X client was blocked by Windows Firewall
+- not sure what it was but felt heavy
 
-#### Docker Desktop
+</details>
+
+### Some known Docker Desktop for Windows issue
 
 - Watching files in the host is not working
 - Hyper-v is not returning unused memory frequently so the host can be struggling with memory.
 
-#### VM
+So it's generally recommended to use WSL2 Ubunu but I would rather use VM
 
-- Virtualbox seems to run many containers more stable and does not apply much pressure to the host memory.
-- There are less issues in developing in Linux than Windows
+### Linuxdev with Vagrant (VirtualBox)
 
-### For Mac Users
+- Virtualbox seems to be able to run many containers more stable and does not apply much pressure to the host memory. (compared to WSL2)
+- Generally there are less issues in developing in Linux than Windows (Same reason to use WSL2)
+- Full configurable linux host (docker)
+- USB ports can be used directly in VM (Note: USB3 in VB is available in the extension pack, which is free for only personal users)
 
-There would be some advantage for Mac users as well
+### Also for Mac Users
+
+Not only for the Windows users, there would be some advantage for Mac users as well
 
 - Easily backup/cleanup VM/dev env
 - The dev env is a sandbox
-- Reference environment for Linux env
-- Run linux GUI apps
+- A reference environment for Linux env
+- Run linux GUI apps using X server and tunneling
 - Docker is running Linux VM already, why not?
+- Multiple network interfaces available
 
-And if you are familiar with the command line, Using Linux makes more senses than using Docker Desktop.
+And if you are familiar with the Linux command line, using Linux makes more senses than using Docker Desktop.
 
-- Share VM when you need bootcamp to windows
+- Share VM when you need to bootcamp to windows
 - Access to docker host
 - Unlimited access to host(Linux VM) root directory
 - Faster host(Linux VM) volume sharing
 - Free
 
-## Setting up the Linux dev environment
+
+
+## Setting up the Linuxdev environment
 
 :warning: Note for Windows users: The script will disable Hyper-v (WSL2).
 
@@ -54,6 +85,7 @@ And if you are familiar with the command line, Using Linux makes more senses tha
     - Windows
         1. Install host dependencies and dev tools
             - Open powershell as Admin and run `setup.ps1`
+            - This might require rebooting.
         1. Bootup vagrant with provision
             - Open terminal (git bash) and run `bootstrap.sh`
     - Mac
@@ -70,12 +102,13 @@ And if you are familiar with the command line, Using Linux makes more senses tha
     - expose samba share, `Projects`
     - generate id_rsa key and show public key
     - add ssh config for linuxdev
+    - generate docker certificates and set bash variables
 
-It's okay to repeat this bootstrap script.
+It's okay to repeat this bootstrap script if something went wrong.
 
-### After finished bootstrap
+### After finished bootstraping
 
-Copy and paste ssh public key to use in Github and so on
+Copy and paste ssh public key to use in Github and where ever it's required.
 
 Now you can ssh into Linux dev env
 
@@ -89,18 +122,7 @@ It installs basic devtools from external [dotfiles project](https://github.com/k
 
 You can override repo by `DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git`
 
-### Demo
-
-`setup.ps1` (Windows Powershell script; Use setup.sh for Mac)
-
-[![asciicast](https://asciinema.org/a/IqGHfToxLcfSwSJRoBIHZBoWY.svg)](https://asciinema.org/a/IqGHfToxLcfSwSJRoBIHZBoWY)
-
-`bootstrap.sh` (Mac; You can also use it in Git bash in Windows Terminal)
-
-[![asciicast](https://asciinema.org/a/o7HNUExImgO6gCKjlUTczwK7G.svg)](https://asciinema.org/a/o7HNUExImgO6gCKjlUTczwK7G)
-
-
-### Commands after setup
+### Useful Commands
 
 - `vagrant halt` to shut down the VM
 - `vagrant up` to turn on the VM
@@ -113,7 +135,22 @@ docker is available and you will see the samba container running for the VM
 
 Please use install-docker-clients script if you don't have docker clients installed.
 
-## Packages covered by setup (host)
+[Vagrant Manager](https://www.vagrantmanager.com/) would be nice to have. 
+
+## Demo
+
+`setup.ps1` (Windows Powershell script; Use setup.sh for Mac)
+
+[![asciicast](https://asciinema.org/a/IqGHfToxLcfSwSJRoBIHZBoWY.svg)](https://asciinema.org/a/IqGHfToxLcfSwSJRoBIHZBoWY)
+
+`bootstrap.sh` (Mac; You can also use it in Git bash in Windows Terminal)
+
+[![asciicast](https://asciinema.org/a/o7HNUExImgO6gCKjlUTczwK7G.svg)](https://asciinema.org/a/o7HNUExImgO6gCKjlUTczwK7G)
+
+
+## Packages managed by Linuxdev
+
+### Packages covered by setup (host)
 
 - vagrant
 - virtualbox
@@ -123,9 +160,7 @@ Please use install-docker-clients script if you don't have docker clients instal
 - iterm2 (Mac)
 - gnu-sed (Mac)
 
-[Vagrant Manager](https://www.vagrantmanager.com/) would be nice to have. 
-
-## Packages covered by bootstrap
+### Packages covered by bootstrap
 
 - docker (installed by vagrant provision)
 - docker-compose
@@ -136,9 +171,11 @@ Please use install-docker-clients script if you don't have docker clients instal
 - vim-gtk (for vim-python3)
 - dnsutils
 
-## docker storage
+## Tips
 
-Docker tend to use many small files especially for node.js
+### docker storage
+
+Docker tend to use many small files especially for node.js projects
 
 If the main storage has not enough inodes, docker can fail because of the disk space.
 You can check that `df -h` has some free space but `df -hi` shows a low free space.
@@ -255,16 +292,17 @@ If you had some data left in the system disk docker libs, you can see that by 1.
 
 ## Installing and using docker clients
 
-This vm provides docker connection in 5 port.
+This vm provides docker connection in `2376` port.
 If you have docker client and set the env vars you can use docker from the host like Docker Desktop.
 
 if you don't have installed docker or docker-compose, you can install by running install-docker-clients script.
 
-`.bashrc` has DOCKER_HOST and required variables for Mac/Git-bash and `docker_env.bat` in the users directory will set variables in the command terminal in Windows.
+`.bashrc` has DOCKER_HOST and required variables for Mac/Git-bash and `docker_env.bat` will set variables in the command terminal in Windows.
 
 ## Additional Goals
 
 - Share virtualbox env across Bootcamp
+- Provide recommended fonts with Powerline patch
 
 ## License
 
