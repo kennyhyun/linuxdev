@@ -10,7 +10,6 @@ docker_port=${DOCKER_PORT:-2376}
 
 cd ~/linuxdev.certs
 
-echo ----- docker_port: $docker_port
 sudo service docker stop
 
 sudo mkdir -p /etc/systemd/system/docker.service.d/
