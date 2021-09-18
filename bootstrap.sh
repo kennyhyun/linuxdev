@@ -199,17 +199,6 @@ docker cp /etc/passwd samba:/etc/passwd
 chmod +x adduser
 ./adduser \$USER
 
-if [ -f ~/.ssh/id_rsa ]; then
-  echo "-----\nssh key aleady exists"
-else
-  echo "-----\nGenerating ssh key"
-  ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ""
-fi
-echo "Paste the public key below into Github or else"
-echo ---------------------
-cat ~/.ssh/id_rsa.pub
-echo ---------------------
-
 if [ -f /dummy ]; then
   filesize=\$(stat -c%s "/dummy")
   if [ "\$filesize" ] && [ "\$filesize" != "0" ]; then
@@ -220,7 +209,9 @@ if [ -f /dummy ]; then
 fi
 EOSSH
 
-if ! [ -d ~/.docker/certs.$machine_name ]; then
+if [ -d ~/.docker/certs.$machine_name ]; then
+  echo "~/.docker/certs.$machine_name already exists, skip creating Docker certs"
+else
   echo "--------
 Creating Docker certs"
   ssh $machine_name mv linuxdev.certs linuxdev.certs.backup || echo ""
@@ -237,9 +228,24 @@ export COMPOSE_CONVERT_WINDOWS_PATHS=1
   if [ -z "$(grep bashrc ~/.bash_profile)" ]; then
     echo "test -f ~/.bashrc && source ~/.bashrc" >> ~/.bash_profile
   fi
-else
-  echo "~/.docker/certs.$machine_name already exists, skip creating Docker certs"
 fi
+
+#### create ssh key
+ssh $machine_name << EOSSH
+
+if [ -f ~/.ssh/id_rsa ]; then
+  echo "-----\nssh key aleady exists"
+else
+  echo "-----\nGenerating ssh key"
+  ssh-keygen -b 2048 -t rsa -f ~/.ssh/id_rsa -q -N ""
+fi
+echo "Paste the public key below into Github or else"
+echo ---------------------
+cat ~/.ssh/id_rsa.pub
+echo ---------------------
+
+EOSSH
+
 mkdir -p ~/Programs
 if [ "$windows" ] && ! [ -f ~/Programs/docker_env.bat ]; then
   powershell ./add-programs-to-path.ps1
