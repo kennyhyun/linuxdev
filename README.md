@@ -1,3 +1,9 @@
+---
+title: "Linuxdev"
+date: 2021-09-18 21:21:13
+description: 'Linuxdev home'
+---
+
 # Linuxdev
 
 Boot up Linux development env using Vagrant
