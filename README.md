@@ -71,7 +71,23 @@ And if you are familiar with the Linux command line, using Linux makes more sens
 - Faster host(Linux VM) volume sharing
 - Free
 
+### Performance comparison
 
+For comparison, I tried one of my project which builds multiple docker images with node.js and filling up 20GB of docker storage.
+
+Building includes installing node packages and webpack.
+Docker build kit was used for cache mounting.
+
+|Env|Build Time|Note|
+|--|--|--|
+|Linuxdev (Windows host)<br>6GB, i7 4 cores| 24m 12s | |
+|WSL2 (Docker Descktop)<br>16GB, i7 6 cores (no .wslconfig) |19m 18s| spent up to 13GB|
+|WSL2 (Docker Descktop)<br>8GB, i7 6 cores (with .wslconfig)| 18m 22s||
+|Linuxdev (Windows host)<br>8GB , i7 6 cores| :heavy_check_mark: **14m 39s**||
+|Mac OSX (Docker Descktop)<br>8GB, i7 6 cores| 19m 37s|First build failed after 1 hour|
+
+This was just an instance of the build. Just to let you know.
+As you noticed, Linuxdev was the best in some situation.
 
 ## Setting up the Linuxdev environment
 
