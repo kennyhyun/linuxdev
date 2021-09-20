@@ -24,7 +24,7 @@ openssl req -new -x509 -days 365 -key ca-key.pem -sha256 -out ca.pem -passin $pa
 openssl genrsa -out server-key.pem 4096
 openssl req -subj "/CN=$common_name" -sha256 -new -key server-key.pem -out server.csr
 
-# create a extensions config file
+# create an extension config file
 echo subjectAltName = DNS:$common_name,IP:$local_ip_addr,IP:127.0.0.1 > extfile.cnf
 echo extendedKeyUsage = serverAuth >> extfile.cnf
 
@@ -65,6 +65,7 @@ cp key.pem /vagrant/certs/
 echo "Certificates has been generated.
 
 <SERVER>
+tlscacert: ca.pem
 tlscert: server-cert.pem
 tlskey: server-key.pem
 
