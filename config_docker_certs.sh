@@ -8,7 +8,7 @@ fi
 
 if [ "$EUID" != "0" ]; then
   echo "This script requires root access. Run this with sudo."
-  exit
+  exit -2
 fi
 
 docker_port=${DOCKER_PORT:-2376}
