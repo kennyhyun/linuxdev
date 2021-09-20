@@ -21,7 +21,8 @@ fi
 if brew -v ; then
   echo Skip installing brew
 else
-  /usr/bin/env bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  brew_install_script=$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)
+  $SHELL -c "$brew_install_script"
 fi
 
 # git
