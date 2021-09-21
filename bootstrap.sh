@@ -218,7 +218,7 @@ Creating Docker certs"
   ssh $machine_name /vagrant/create_docker_certs.sh
   mkdir -p ~/.docker/certs.$machine_name
   cp ./certs/*.pem ~/.docker/certs.$machine_name/
-  ssh $machine_name /vagrant/config_docker_certs.sh
+  ssh $machine_name sudo /vagrant/config_docker_certs.sh
   echo "export DOCKER_CERT_PATH=~/.docker/certs.$machine_name
 export DOCKER_HOST=tcp://$ip_address:$docker_port
 export DOCKER_TLS_VERIFY=1
