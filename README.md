@@ -85,6 +85,7 @@ Docker build kit was used for cache mounting.
 |WSL2 (Docker Descktop)<br>8GB, i7 6 cores (with .wslconfig)| 18m 22s||
 |Linuxdev (Windows host)<br>8GB , i7 6 cores| :heavy_check_mark: **14m 39s**||
 |Mac OSX (Docker Descktop)<br>8GB, i7 6 cores| 19m 37s|First build failed after 1 hour|
+|Linuxdev (Windows host)<br>8GB , i7 4 cores| 21m 13s||
 
 This was just an instance of the build. Just to let you know.
 As you noticed, Linuxdev was the best in some situation.
