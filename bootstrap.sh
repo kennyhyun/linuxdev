@@ -199,6 +199,40 @@ docker cp /etc/passwd samba:/etc/passwd
 chmod +x adduser
 ./adduser \$USER
 
+if [ -f /dummy ]; then
+  filesize=\$(stat -c%s "/dummy")
+  if [ "\$filesize" ] && [ "\$filesize" != "0" ]; then
+    echo \$filesize was larger than 1, removing /dummy
+    sudo rm /dummy
+    sudo touch /dummy
+  fi
+fi
+EOSSH
+
+if [ -d ~/.docker/certs.$machine_name ]; then
+  echo "~/.docker/certs.$machine_name already exists, skip creating Docker certs"
+else
+  echo "--------
+Creating Docker certs"
+  ssh $machine_name mv linuxdev.certs linuxdev.certs.backup || echo ""
+  ssh $machine_name /vagrant/create_docker_certs.sh
+  mkdir -p ~/.docker/certs.$machine_name
+  cp ./certs/*.pem ~/.docker/certs.$machine_name/
+  ssh $machine_name sudo /vagrant/config_docker_certs.sh
+  echo "export DOCKER_CERT_PATH=~/.docker/certs.$machine_name
+export DOCKER_HOST=tcp://$ip_address:$docker_port
+export DOCKER_TLS_VERIFY=1
+export COMPOSE_CONVERT_WINDOWS_PATHS=1
+" >> ~/.bashrc
+  touch ~/.bash_profile
+  if [ -z "$(grep bashrc ~/.bash_profile)" ]; then
+    echo "test -f ~/.bashrc && source ~/.bashrc" >> ~/.bash_profile
+  fi
+fi
+
+#### create ssh key
+ssh $machine_name << EOSSH
+
 if [ -f ~/.ssh/id_rsa ]; then
   echo "-----\nssh key aleady exists"
 else
@@ -210,36 +244,8 @@ echo ---------------------
 cat ~/.ssh/id_rsa.pub
 echo ---------------------
 
-if [ -f /dummy ]; then
-  filesize=\$(stat -c%s "/dummy")
-  if [ "\$filesize" ] && [ "\$filesize" != "0" ]; then
-    echo \$filesize was larger than 1, removing /dummy
-    sudo rm /dummy
-    sudo touch /dummy
-  fi
-fi
 EOSSH
 
-if ! [ -d ~/.docker/certs.$machine_name ]; then
-  echo "--------
-Creating Docker certs"
-  ssh $machine_name mv linuxdev.certs linuxdev.certs.backup || echo ""
-  ssh $machine_name /vagrant/create_docker_certs.sh
-  mkdir -p ~/.docker/certs.$machine_name
-  cp ./certs/*.pem ~/.docker/certs.$machine_name/
-  ssh $machine_name /vagrant/config_docker_certs.sh
-  echo "export DOCKER_CERT_PATH=~/.docker/certs.$machine_name
-export DOCKER_HOST=tcp://$ip_address:$docker_port
-export DOCKER_TLS_VERIFY=1
-export COMPOSE_CONVERT_WINDOWS_PATHS=1
-" >> ~/.bashrc
-  touch ~/.bash_profile
-  if [ -z "$(grep bashrc ~/.bash_profile)" ]; then
-    echo "test -f ~/.bashrc && source ~/.bashrc" >> ~/.bash_profile
-  fi
-else
-  echo "~/.docker/certs.$machine_name already exists, skip creating Docker certs"
-fi
 mkdir -p ~/Programs
 if [ "$windows" ] && ! [ -f ~/Programs/docker_env.bat ]; then
   powershell ./add-programs-to-path.ps1

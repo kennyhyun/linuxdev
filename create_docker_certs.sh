@@ -13,8 +13,11 @@ common_name=$local_ip_addr
 
 passphrase=pass:passwd
 
-mkdir -p ~/linuxdev.certs
-cd ~/linuxdev.certs
+tmpdir=$(mktemp -d)
+client_certs_dir=/vagrant/certs/
+server_certs_dir=/var/docker/
+
+pushd $tmpdir
 
 # generate CA private and public keys
 openssl genrsa -aes256 -out ca-key.pem -passout $passphrase 4096
@@ -24,7 +27,7 @@ openssl req -new -x509 -days 365 -key ca-key.pem -sha256 -out ca.pem -passin $pa
 openssl genrsa -out server-key.pem 4096
 openssl req -subj "/CN=$common_name" -sha256 -new -key server-key.pem -out server.csr
 
-# create a extensions config file
+# create an extension config file
 echo subjectAltName = DNS:$common_name,IP:$local_ip_addr,IP:127.0.0.1 > extfile.cnf
 echo extendedKeyUsage = serverAuth >> extfile.cnf
 
@@ -50,21 +53,26 @@ rm -v client.csr server.csr extfile.cnf extfile-client.cnf
 chmod -v 0400 ca-key.pem key.pem server-key.pem
 chmod -v 0444 ca.pem server-cert.pem cert.pem
 
-# copy server certs to /var/docker
-sudo mkdir -p /var/docker
-sudo cp server*.pem /var/docker/
-sudo cp ca.pem /var/docker/
-echo Copied server certs to /var/docker/
+sudo mkdir -p $server_certs_dir
 
 # copy client certs to host
-rm -f /vagrant/certs/*.pem
-cp ca.pem /vagrant/certs/
-cp cert.pem /vagrant/certs/
-cp key.pem /vagrant/certs/
+rm -f ${client_certs_dir}*.pem
+cp ca.pem $client_certs_dir
+cp cert.pem $client_certs_dir
+cp key.pem $client_certs_dir
+echo Copied client certs to $client_certs_dir
+
+# copy server certs to $server_certs_dir
+sudo cp server*.pem $server_certs_dir
+sudo cp ca.pem $server_certs_dir
+echo Copied server certs to $server_certs_dir
+
+popd
 
 echo "Certificates has been generated.
 
 <SERVER>
+tlscacert: ca.pem
 tlscert: server-cert.pem
 tlskey: server-key.pem
 
