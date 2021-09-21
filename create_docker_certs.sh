@@ -17,7 +17,7 @@ tmpdir=$(mktemp -d)
 client_certs_dir=/vagrant/certs/
 server_certs_dir=/var/docker/
 
-pushd tmpdir
+pushd $tmpdir
 
 # generate CA private and public keys
 openssl genrsa -aes256 -out ca-key.pem -passout $passphrase 4096
