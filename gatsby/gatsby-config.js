@@ -39,7 +39,7 @@ module.exports = {
       options: {
         delims: ['<!---', '--->'],
         plugins: [
-          `gatsby-remark-autolink-headers`,
+          `gatsby-remark-autolink-headers`, // add hash links to headings
           {
             resolve: `gatsby-remark-images`,
             options: {
@@ -52,10 +52,17 @@ module.exports = {
               wrapperStyle: `margin-bottom: 1.0725rem`,
             },
           },
-          `gatsby-remark-prismjs`,
-          `gatsby-remark-copy-linked-files`,
+          `gatsby-remark-prismjs`, // code block styling
+          {
+            // copy linked files to the root directory (public)
+            resolve: `gatsby-remark-copy-linked-files`,
+            options: {
+              ignoreFileExtensions: [`md`],
+            },
+          },
           `gatsby-remark-smartypants`,
           {
+            // annotate classes
             resolve: `gatsby-remark-classes`,
             options: {
               classMap: {
@@ -65,7 +72,14 @@ module.exports = {
               }
             }
           },
-          'gatsby-remark-relative-linker',
+          {
+            // make absolute links to relative
+            resolve: "gatsby-remark-relative-links",
+            options: {
+              domainRegex: /http[s]*:\/\/[kenny.]*yeoyou\.net[/]?/,
+            }
+          },
+          'gatsby-remark-relative-linker', // remove .md in relative links
         ],
       },
     },

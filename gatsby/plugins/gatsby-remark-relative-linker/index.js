@@ -5,9 +5,7 @@ module.exports = ({ markdownAST }) => {
     const { url } = node
     if (
       url &&
-      !url.startsWith("//") &&
-      !url.startsWith("http") &&
-      url.startsWith("/")
+      url.startsWith("./")
     ) {
       node.url = url.replace(/(.*)\.md(#.*)?$/, (match, base, hash = '') => `${base}${hash}`)
     }
