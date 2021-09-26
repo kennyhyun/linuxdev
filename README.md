@@ -140,7 +140,7 @@ It installs basic devtools from external [dotfiles project](https://github.com/k
 
 You can override repo by `DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git`
 
-### [Useful Commands](./docs/tips)
+### [Useful Commands](./docs/tips.md)
 
 ## Demo
 
@@ -176,7 +176,7 @@ You can override repo by `DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git`
 - vim-gtk (for vim-python3)
 - dnsutils
 
-## [Tips](./docs/tips)
+## [Tips](./docs/tips.md)
 
 ## Configure .env
 

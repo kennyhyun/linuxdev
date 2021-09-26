@@ -9,7 +9,7 @@ const BlogIndex = ({ data, location }) => {
   const siteTitle = data.site.siteMetadata?.title || `Title`
   const posts = data.allMarkdownRemark.nodes
   const { html = '' } = data.markdownRemark || {}
-  const readmeHtml = html.replace(/<h1.*<\/h1>/, "")
+  const readmeHtml = html?.replace(/<h1.*<\/h1>/, "")
 
   if (posts.length === 0) {
     return (
