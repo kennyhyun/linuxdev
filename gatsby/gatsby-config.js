@@ -22,16 +22,9 @@ module.exports = {
     {
       resolve: `gatsby-source-filesystem`,
       options: {
-        path: `${rootDir}/docs`,
-        name: `docs`,
-      },
-    },
-    {
-      resolve: `gatsby-source-filesystem`,
-      options: {
         name: `rootfiles`,
         path: rootDir,
-        ignore: [new RegExp(`${rootDir}\/.*\/`)],
+        ignore: [new RegExp(`^${rootDir}\/((?!(docs|README)).)*$`)],
       },
     },
     {
