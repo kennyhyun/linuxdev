@@ -12,7 +12,6 @@ module.exports = ({ markdownAST }) => {
       node.url = url.replace(/(.*)\.md(#.*)?$/, (match, base, hash) => {
         return `${base}${hash}`
       })
-      console.log("Replaced link:", url, node.url)
     }
   })
 
