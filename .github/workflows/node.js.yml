@@ -15,15 +15,20 @@ jobs:
       working-directory: ./gatsby
     steps:
       - uses: actions/checkout@v2
+        working-directory: ${{ env.working-directory }}
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v2
+        working-directory: ${{ env.working-directory }}
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
       - run: npm ci
+        working-directory: ${{ env.working-directory }}
       - run: npx gatsby build --prefix-paths
+        working-directory: ${{ env.working-directory }}
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v3
+        working-directory: ${{ env.working-directory }}
         if: ${{ github.ref == 'refs/heads/main' }}
         with:
           github_token: ${{ secrets.GITHUB_TOKEN  }}
