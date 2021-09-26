@@ -1,3 +1,8 @@
+<!---
+title: Tips
+date: 2021-09-26
+--->
+
 # Tips
 
 ## Useful Commands

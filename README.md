@@ -4,18 +4,18 @@ Boot up Linux development env using Vagrant
 
 |  | Docker Desktop  | Linuxdev with Vagrant |
 |--|------|------|
-|Docker hub account	|<sub>signin is required if you want to stop checking updates</sub>	|<sub>:heavy_check_mark:**login to Docker hub is not necessary**</sub>|
-|Control over the Docker Engine Version	|<sub>Should use latest above v3, unless the user ignore the updates</sub>|<sub>:heavy_check_mark:**have the controll for docker-ce (community edition)**</sub>|
-|Licensing	|<sub>free for small business and personal, but auto-checking-update</sub>|<sub>:heavy_check_mark:**free of charge (w/o VB extension pack)**</sub>|
-|Network setup	|<sub>Host network	</sub>|<sub>:heavy_check_mark:**Can Choose <br>. Bridge(host) <br>. NAT + Host-only**</sub>|
+|Docker hub account	|<sub>signin is required if you want to stop checking updates</sub>	|<sub>✅**login to Docker hub is not necessary**</sub>|
+|Control over the Docker Engine Version	|<sub>Should use latest above v3, unless the user ignore the updates</sub>|<sub>✅**have the controll for docker-ce (community edition)**</sub>|
+|Licensing	|<sub>free for small business and personal, but auto-checking-update</sub>|<sub>✅**free of charge (w/o VB extension pack)**</sub>|
+|Network setup	|<sub>Host network	</sub>|<sub>✅**Can Choose <br>. Bridge(host) <br>. NAT + Host-only**</sub>|
 |Performance	|<sub>. Hyper-v VM; might be slightly better but it likely consumes more memory</sub>|<sub>. Virtualbox VM; not so bad<br>. Has alternatives (Hyper-v/VMWare/Virtualbox)</sub>|
-|Environment	|<sub>Slightly different environment between<br>. Windows WSL2 (Custom distro integration required for Docker host access)<br>. Windows VM (w/o Docker host acess)<br>. Mac VM (w/o Docker host acess)</sub>|<sub>:heavy_check_mark:**Common Linux environment available in Mac/Windows<br>. Full Linux VM will be provided as a Docker host<br>  (Files can be shared natively in Linux host)<br>. Docker engine can be also accessed from the host OS<br>  (docker and docker-compose client installation required)**</sub>|
+|Environment	|<sub>Slightly different environment between<br>. Windows WSL2 (Custom distro integration required for Docker host access)<br>. Windows VM (w/o Docker host acess)<br>. Mac VM (w/o Docker host acess)</sub>|<sub>✅**Common Linux environment available in Mac/Windows<br>. Full Linux VM will be provided as a Docker host<br>  (Files can be shared natively in Linux host)<br>. Docker engine can be also accessed from the host OS<br>  (docker and docker-compose client installation required)**</sub>|
 |Installation	|<sub>Installer provided</sub>|<sub>Install scripts provided</sub>|
-|Starting Docker	|<sub>:heavy_check_mark:**Autostart configurable**</sub>|<sub>Manually by Vagrant Manager or cli<br>Startup script should be configurable</sub>|
+|Starting Docker	|<sub>✅**Autostart configurable**</sub>|<sub>Manually by Vagrant Manager or cli<br>Startup script should be configurable</sub>|
 |Clients	|<sub>Provided along with the Docker Desktop installer</sub>|<sub>Install scripts provided</sub>|
-|Config	|<sub>:heavy_check_mark:**Configurable in GUI**</sub>|<sub>Configurable in script</sub>|
-|Docker storage	|<sub>Configurable size</sub>|<sub>:heavy_check_mark:**Configurable 2k block size with a lot of inodes**</sub>|
-|Logs/status	|<sub>:heavy_check_mark:**GUI provided**</sub>|<sub>Only available in CLI</sub>|
+|Config	|<sub>✅**Configurable in GUI**</sub>|<sub>Configurable in script</sub>|
+|Docker storage	|<sub>Configurable size</sub>|<sub>✅**Configurable 2k block size with a lot of inodes**</sub>|
+|Logs/status	|<sub>✅**GUI provided**</sub>|<sub>Only available in CLI</sub>|
 |Limiting memory usuage	|<sub>.wslconfig file for WSL2/GUI for VM</sub>|<sub>.env file/VirtualBox GUI</sub>|
 
 
@@ -83,7 +83,7 @@ Docker build kit was used for cache mounting.
 |Linuxdev (Windows host)<br>6GB, i7 4 cores| 24m 12s | |
 |WSL2 (Docker Descktop)<br>16GB, i7 6 cores (no .wslconfig) |19m 18s| spent up to 13GB|
 |WSL2 (Docker Descktop)<br>8GB, i7 6 cores (with .wslconfig)| 18m 22s||
-|Linuxdev (Windows host)<br>8GB , i7 6 cores| :heavy_check_mark: **14m 39s**||
+|Linuxdev (Windows host)<br>8GB , i7 6 cores| ✅ **14m 39s**||
 |Mac OSX (Docker Descktop)<br>8GB, i7 6 cores| 19m 37s|First build failed after 1 hour|
 |Linuxdev (Windows host)<br>8GB , i7 4 cores| 21m 13s||
 
@@ -92,7 +92,8 @@ As you noticed, Linuxdev was the best in some situation.
 
 ## Setting up the Linuxdev environment
 
-:warning: Note for Windows users: The script will disable Hyper-v (WSL2).
+### ⚠ Note for Windows users
+The script will disable Hyper-v (WSL2) but you can still use docker cli
 
 ### Running scripts
 
@@ -139,20 +140,7 @@ It installs basic devtools from external [dotfiles project](https://github.com/k
 
 You can override repo by `DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git`
 
-### Useful Commands
-
-- `vagrant halt` to shut down the VM
-- `vagrant up` to turn on the VM
-- `vagrant reload` apply .env settings like MEMORY, CPUS with **rebooting vm**
-- `./destory.sh` to destroy the VM and start from scratch
-
-If you want to repeat from scratch for some reason, you can run `./destroy.sh` and retry `bootstrap.sh`.
-
-docker is available and you will see the samba container running for the VM
-
-Please use install-docker-clients script if you don't have docker clients installed.
-
-[Vagrant Manager](https://www.vagrantmanager.com/) would be nice to have. 
+### [Useful Commands](./docs/tips)
 
 ## Demo
 
@@ -188,71 +176,8 @@ Please use install-docker-clients script if you don't have docker clients instal
 - vim-gtk (for vim-python3)
 - dnsutils
 
-## Tips
+## [Tips](./docs/tips)
 
-### docker storage
-
-Docker tend to use many small files especially for node.js projects
-
-If the main storage has not enough inodes, docker can fail because of the disk space.
-You can check that `df -h` has some free space but `df -hi` shows a low free space.
-
-BTW, You can prune unused file by following docker command but it would rebuild required files soon.
-
-```sh
-docker system prune --volumes
-```
-
-This vgrantfile has additional space file of 40GB and it can be configured by `DOCKER_DISK_SIZE_GB=40`
-
-## Details For Windows 10 users
-
-<details>
-  <summary>Click to expand!</summary>
-
-### setup.ps1
-
-> :warning: **Note that this script will disable WSL2(Hyper-V).**
->
-> Please backup any required files before running. Docker will be still available by this VM
-
-Right click windows menu and click Windows Powershell (Admin)
-
-```powershell
-Set-ExecutionPolicy RemoteSigned
-```
-
-Run the setup script in the directory of this repo
-
-```powershell
-\Users\xxx\linuxdev\setup.ps1
-```
-
-** Running setup script again will check updates and install if newer version found
-
-### bootstrap.sh
-
-Open Windows Terminal for Gitbash or just Git Bash
-
-In linuxdev dir (this repo)
-
-```bash
-./bootstrap.sh
-```
-
-This will create virtualbox machine and bootup and config
-
-### Map network drive from the machine
-
-Virtualbox machine has IP of 192.168.99.123 by default
-and it shares Projects directory so Host machine can see the files in it.
-
-\\192.168.99.123\Projects
-
-** Windows git global config should turn filemode off
-
-</details>
-    
 ## Configure .env
 
 You can create .env to customize. The default values will be used if not exists.
@@ -274,7 +199,7 @@ MEMORY=8192
 
 This will adjust cpus and memory, run `vagrant reload` to apply when updated.
 
-### Expand disk size :warning:
+### Expand disk size
 
 ```
 EXPAND_DISK_GB=10
