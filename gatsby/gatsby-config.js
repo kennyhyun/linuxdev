@@ -24,7 +24,7 @@ module.exports = {
       options: {
         name: `rootfiles`,
         path: rootDir,
-        ignore: [new RegExp(`^${rootDir}\/((?!(docs|README)).)*$`)],
+        ignore: [new RegExp(`^${rootDir}\/((?!(docs|README)).)*$`, 'i')],
       },
     },
     {
