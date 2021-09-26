@@ -65,12 +65,7 @@ module.exports = {
               }
             }
           },
-          {
-            resolve: `gatsby-remark-relative-links`,
-            options: {
-              domainRegex: null,
-            },
-          }
+          'gatsby-remark-relative-linker',
         ],
       },
     },
