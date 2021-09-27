@@ -276,7 +276,7 @@ if [ -z "$DOTFILES_REPO" ]; then
   echo "DOTFILES_REPO is not defined. skipping"
 else
   ssh $machine_name << EOSSH
-if ! [ -d "~/dotfiles" ]; then
+if ! [ -d ~/dotfiles ]; then
   echo "======= Cloning dotfiles"
   git clone $DOTFILES_REPO ~/dotfiles && \
   init=\$(find dotfiles -maxdepth 1 -type f -executable -name 'init*') && \
