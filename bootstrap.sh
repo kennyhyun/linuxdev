@@ -51,7 +51,7 @@ fi
 if [ -z "$DOTFILES_REPO" ]; then
   echo -n "> Please enter the dotfiles repo (try https://github.com/kennyhyun/dotfiles.git if you don't have one):"
   read input
-  DOTFILES_REPO=input
+  DOTFILES_REPO=$input
   echo "DOTFILES_REPO=${input}">> .env
 fi
 
@@ -270,7 +270,9 @@ export COMPOSE_CONVERT_WINDOWS_PATHS=1
 fi
 
 #### init dotfiles
-if ! [ -z "$DOTFILES_REPO" ]; then
+if [ -z "$DOTFILES_REPO" ]; then
+  echo "DOTFILES_REPO is not defined. skipping"
+else
   ssh $machine_name << EOSSH
 if ! [ -d "~/dotfiles" ]; then
   echo "======= Cloning dotfiles"
