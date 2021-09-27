@@ -127,9 +127,11 @@ echo "$username ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/98_$username
 chmod 440 /etc/sudoers.d/98_$username
 usermod -aG docker $username
 
-if [[ "$(hostname)" =~ ^debian-[0-9]+$ ]]; then
+if [[ "\$(hostname)" =~ ^debian-[0-9]+$ ]]; then
   echo found default hostname, changing it to $machine_name
   hostname $machine_name
+  echo $machine_name > /etc/hostname
+  echo "127.0.0.1 $machine_name" >> /etc/hosts
 fi
 
 if [ $swapfile ]; then
