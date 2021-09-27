@@ -160,6 +160,13 @@ Adding startup script to crontab"
   cp /vagrant/vm.startup.sh /root/${machine_name}.startup.sh && \
   chmod +x /root/${machine_name}.startup.sh && \
   crontab -l | { cat; echo "@reboot /root/${machine_name}.startup.sh"; } | crontab -
+  if ! [ -z "$DOCKER_DISK_SIZE_GB" ]; then
+   sdb1=\$(fdisk -l /dev/sdb|grep sdb1)
+   if [ -z "\$sdb1" ]; then
+     echo "Found an empty disk, make it a docker storage; /dev/sdb1, ${DOCKER_DISK_SIZE_GB}GB"
+     /root/${machine_name}.startup.sh
+   fi
+  fi
 else
   echo "-----
 crontab scripts:"
