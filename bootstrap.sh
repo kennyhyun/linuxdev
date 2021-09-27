@@ -29,6 +29,33 @@ if [ -z "$VAGRANT_USERNAME" ]; then
 fi
 
 machine_name=${NAME:-linuxdev}
+if [ -z "$NAME" ]; then
+  echo -n "> Please enter the machine name [linuxdev]:"
+  read input
+  machine_name=${input:-linuxdev}
+  echo "NAME=${machine_name}">> .env
+fi
+
+if [ -z "$CPU" ]; then
+  echo -n "> Please enter the number of cpus to assign to the VM [2]:"
+  read input
+  echo "CPU=${input:-2}">> .env
+fi
+
+if [ -z "$MEMORY" ]; then
+  echo -n "> Please enter the kilobytes of memory [1024]:"
+  read input
+  echo "MEMORY=${input:-1024}">> .env
+fi
+
+if [ -z "$DOTFILES_REPO" ]; then
+  echo -n "> Please enter the dotfiles repo (try https://github.com/kennyhyun/dotfiles.git if you don't have one):"
+  read input
+  DOTFILES_REPO=$input
+  echo "DOTFILES_REPO=${input}">> .env
+fi
+
+echo =================================
 echo Welcome $username! Pleae wait a moment for bootstrapping $machine_name
 
 vagrant plugin install vagrant-env
@@ -100,6 +127,13 @@ echo "$username ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/98_$username
 chmod 440 /etc/sudoers.d/98_$username
 usermod -aG docker $username
 
+if [[ "\$(hostname)" =~ ^debian-[0-9]+$ ]]; then
+  echo found default hostname, changing it to $machine_name
+  hostname $machine_name
+  echo $machine_name > /etc/hostname
+  echo "127.0.0.1 $machine_name" >> /etc/hosts
+fi
+
 if [ $swapfile ]; then
   echo Found SWAPFILE config
   if ! [ -f /swapfile ]; then
@@ -135,6 +169,13 @@ Adding startup script to crontab"
   cp /vagrant/vm.startup.sh /root/${machine_name}.startup.sh && \
   chmod +x /root/${machine_name}.startup.sh && \
   crontab -l | { cat; echo "@reboot /root/${machine_name}.startup.sh"; } | crontab -
+  if ! [ -z "$DOCKER_DISK_SIZE_GB" ]; then
+   sdb1=\$(fdisk -l /dev/sdb|grep sdb1)
+   if [ -z "\$sdb1" ]; then
+     echo "Found an empty disk, make it a docker storage; /dev/sdb1, ${DOCKER_DISK_SIZE_GB}GB"
+     /root/${machine_name}.startup.sh
+   fi
+  fi
 else
   echo "-----
 crontab scripts:"
@@ -230,6 +271,29 @@ export COMPOSE_CONVERT_WINDOWS_PATHS=1
   fi
 fi
 
+#### init dotfiles
+if [ -z "$DOTFILES_REPO" ]; then
+  echo "DOTFILES_REPO is not defined. skipping"
+else
+  ssh $machine_name << EOSSH
+if ! [ -d ~/dotfiles ]; then
+  echo "======= Cloning dotfiles"
+  git clone $DOTFILES_REPO ~/dotfiles && \
+  init=\$(find dotfiles -maxdepth 1 -type f -executable -name 'init*') && \
+  bootstrap=\$(find dotfiles -maxdepth 1 -type f -executable -name 'bootstrap*') && \
+  if [ -f "\$init" ]; then
+    \$init
+    echo "======= Ran \$init ($?)"
+  elif [ -f "\$bootstrap" ]; then
+    \$bootstrap
+    echo "======= Ran \$bootstrap ($?)"
+  else
+    echo "!!!! could not find init script. please run manually"
+  fi
+fi
+EOSSH
+fi
+
 #### create ssh key
 ssh $machine_name << EOSSH
 
@@ -270,11 +334,9 @@ You can now ssh into the machine by
 ssh $machine_name
 \`\`\`
 
-- In ssh, run \`/vagrant/init_dotfiles.sh\` to continue setting up dotfiles
-    - you can override repo by \`DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git\`
-- \`./destory.sh\` to start from scratch
 - \`vagrant halt\` to shut down the VM
 - \`vagrant up\` to turn on the VM
+- \`./destory.sh\` to start from scratch
 
 Don't forget to paste the ssh key above to the dotfile repo host like Github
 "
