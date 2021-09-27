@@ -28,7 +28,32 @@ if [ -z "$VAGRANT_USERNAME" ]; then
   echo "VAGRANT_USERNAME=$username">> .env
 fi
 
+if [ -z "$NAME" ]; then
+  echo -n "> Please enter the machine name [linuxdev]:"
+  read input
+  echo "NAME=${input:-linuxdev}">> .env
+fi
+
+if [ -z "$CPU" ]; then
+  echo -n "> Please enter the number of cpus to assign to the VM [2]:"
+  read input
+  echo "CPU=${input:-2}">> .env
+fi
+
+if [ -z "$MEMORY" ]; then
+  echo -n "> Please enter the kilobytes of memory [1024]:"
+  read input
+  echo "MEMORY=${input:-1024}">> .env
+fi
+
+if [ -z "$DOTFILES_REPO" ]; then
+  echo -n "> Please enter the dotfiles repo (try https://github.com/kennyhyun/dotfiles.git if you don't have one):"
+  read input
+  echo "DOTFILES_REPO=${input}">> .env
+fi
+
 machine_name=${NAME:-linuxdev}
+echo =================================
 echo Welcome $username! Pleae wait a moment for bootstrapping $machine_name
 
 vagrant plugin install vagrant-env
