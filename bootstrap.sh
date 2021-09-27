@@ -28,10 +28,12 @@ if [ -z "$VAGRANT_USERNAME" ]; then
   echo "VAGRANT_USERNAME=$username">> .env
 fi
 
+machine_name=${NAME:-linuxdev}
 if [ -z "$NAME" ]; then
   echo -n "> Please enter the machine name [linuxdev]:"
   read input
-  echo "NAME=${input:-linuxdev}">> .env
+  machine_name=${input:-linuxdev}
+  echo "NAME=${machine_name}">> .env
 fi
 
 if [ -z "$CPU" ]; then
@@ -49,10 +51,10 @@ fi
 if [ -z "$DOTFILES_REPO" ]; then
   echo -n "> Please enter the dotfiles repo (try https://github.com/kennyhyun/dotfiles.git if you don't have one):"
   read input
+  DOTFILES_REPO=input
   echo "DOTFILES_REPO=${input}">> .env
 fi
 
-machine_name=${NAME:-linuxdev}
 echo =================================
 echo Welcome $username! Pleae wait a moment for bootstrapping $machine_name
 
@@ -271,16 +273,16 @@ fi
 if ! [ -z "$DOTFILES_REPO" ]; then
   ssh $machine_name << EOSSH
 if ! [ -d "~/dotfiles" ]; then
-  echo ======= Cloning dotfiles
+  echo "======= Cloning dotfiles"
   git clone $DOTFILES_REPO ~/dotfiles && \
   init=\$(find dotfiles -maxdepth 1 -type f -executable -name 'init*') && \
   bootstrap=\$(find dotfiles -maxdepth 1 -type f -executable -name 'bootstrap*') && \
   if [ -f "\$init" ]; then
     \$init
-    echo ======= Ran \$init ($?)
+    echo "======= Ran \$init ($?)"
   elif [ -f "\$bootstrap" ]; then
     \$bootstrap
-    echo ======= Ran \$bootstrap ($?)
+    echo "======= Ran \$bootstrap ($?)"
   else
     echo "!!!! could not find init script. please run manually"
   fi
