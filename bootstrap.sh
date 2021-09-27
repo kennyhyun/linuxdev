@@ -334,9 +334,9 @@ You can now ssh into the machine by
 ssh $machine_name
 \`\`\`
 
-- \`./destory.sh\` to start from scratch
 - \`vagrant halt\` to shut down the VM
 - \`vagrant up\` to turn on the VM
+- \`./destory.sh\` to start from scratch
 
 Don't forget to paste the ssh key above to the dotfile repo host like Github
 "
