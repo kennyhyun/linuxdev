@@ -255,6 +255,27 @@ export COMPOSE_CONVERT_WINDOWS_PATHS=1
   fi
 fi
 
+#### init dotfiles
+if ! [ -z "$DOTFILES_REPO" ]; then
+  ssh $machine_name << EOSSH
+if ! [ -d "~/dotfiles" ]; then
+  echo ======= Cloning dotfiles
+  git clone $DOTFILES_REPO ~/dotfiles && \
+  init=\$(find dotfiles -maxdepth 1 -type f -executable -name 'init*') && \
+  bootstrap=\$(find dotfiles -maxdepth 1 -type f -executable -name 'bootstrap*') && \
+  if [ -f "\$init" ]; then
+    \$init
+    echo ======= Ran \$init ($?)
+  elif [ -f "\$bootstrap" ]; then
+    \$bootstrap
+    echo ======= Ran \$bootstrap ($?)
+  else
+    echo "!!!! could not find init script. please run manually"
+  fi
+fi
+EOSSH
+fi
+
 #### create ssh key
 ssh $machine_name << EOSSH
 
@@ -295,8 +316,6 @@ You can now ssh into the machine by
 ssh $machine_name
 \`\`\`
 
-- In ssh, run \`/vagrant/init_dotfiles.sh\` to continue setting up dotfiles
-    - you can override repo by \`DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git\`
 - \`./destory.sh\` to start from scratch
 - \`vagrant halt\` to shut down the VM
 - \`vagrant up\` to turn on the VM
