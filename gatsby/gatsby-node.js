@@ -1,5 +1,10 @@
 const path = require(`path`)
 const { createFilePath } = require(`gatsby-source-filesystem`)
+const { attachFields } = require(`gatsby-plugin-node-fields`)
+const config = require(`./gatsby-config`);
+
+const { plugins } = config;
+const { options: i18nextOptions } = plugins.find(p => p.resolve === 'gatsby-plugin-react-i18next');
 
 exports.createPages = async ({ graphql, actions, reporter }) => {
   const { createPage } = actions
@@ -58,6 +63,35 @@ exports.createPages = async ({ graphql, actions, reporter }) => {
   }
 }
 
+const { languages, defaultLanguage } = i18nextOptions;
+const descriptors = [
+  {
+    predicate: node => node.internal.type === `MarkdownRemark`,
+    fields: [
+      {
+        name: "defaultLanguage",
+        getter: () => defaultLanguage,
+        defaultValue: "",
+      },
+      {
+        name: "language",
+        getter: node => {
+          const {
+            fields: { slug = '' },
+          } = node
+          const firstPathSegment = slug
+            .split("/")
+            .filter(a => a)
+            .shift()
+          const matchingIndex = languages.indexOf(firstPathSegment)
+          return matchingIndex >= 0 ? languages[matchingIndex] : ""
+        },
+        defaultValue: "",
+      },
+    ],
+  },
+];
+
 exports.onCreateNode = ({ node, actions, getNode }) => {
   const { createNodeField } = actions
 
@@ -70,6 +104,7 @@ exports.onCreateNode = ({ node, actions, getNode }) => {
       value,
     })
   }
+  attachFields(node, actions, getNode, descriptors)
 }
 
 exports.createSchemaCustomization = ({ actions }) => {
@@ -113,6 +148,8 @@ exports.createSchemaCustomization = ({ actions }) => {
 
     type Fields {
       slug: String
+      language: String
+      defaultLanguage: String
     }
   `)
 }

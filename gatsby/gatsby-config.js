@@ -1,22 +1,27 @@
-const path = require('path');
-const rootDir = path.dirname(path.resolve(__dirname));
+const path = require("path")
+const rootDir = path.dirname(path.resolve(__dirname))
+
+const siteMetadata = {
+  title: `Linuxdev Documentation`,
+  author: {
+    name: `Kenny Yeo`,
+    summary: `who lives and works in Sydney building useful things.`,
+  },
+  description: `Linuxdev, a VM environment for developers with Vagrant, Linux and Docker`,
+  siteUrl: `https://kenny.yeoyou.net/linuxdev/`,
+  social: {
+    linkedin: `khyunyeo`,
+    github: `kennyhyun`,
+    disqusShortName: `kennyyeoyounet`,
+  },
+}
+
+const languages = [`en`, `ko`, `ja`]
+const defaultLanguage = `en`;
 
 module.exports = {
   pathPrefix: `/linuxdev`,
-  siteMetadata: {
-    title: `Linuxdev Documentation`,
-    author: {
-      name: `Kenny Yeo`,
-      summary: `who lives and works in Sydney building useful things.`,
-    },
-    description: `Linuxdev, a VM environment for developers with Vagrant, Linux and Docker`,
-    siteUrl: `https://kenny.yeoyou.net/linuxdev/`,
-    social: {
-      linkedin: `khyunyeo`,
-      github: `kennyhyun`,
-      disqusShortName: `kennyyeoyounet`
-    },
-  },
+  siteMetadata,
   plugins: [
     `gatsby-plugin-image`,
     {
@@ -24,7 +29,7 @@ module.exports = {
       options: {
         name: `rootfiles`,
         path: rootDir,
-        ignore: [new RegExp(`^${rootDir}\/((?!(docs|README)).)*$`, 'i')],
+        ignore: [new RegExp(`^${rootDir}\/((?!(docs|README)).)*$`, "i")],
       },
     },
     {
@@ -35,9 +40,42 @@ module.exports = {
       },
     },
     {
+      resolve: `gatsby-source-filesystem`,
+      options: {
+        path: `${__dirname}/locales`,
+        name: `locale`,
+      },
+    },
+    {
+      resolve: `gatsby-plugin-react-i18next`,
+      options: {
+        localeJsonSourceName: `locale`,
+        languages,
+        defaultLanguage,
+        siteUrl: siteMetadata.siteUrl,
+        i18nextOptions: {
+          interpolation: {
+            escapeValue: false,
+          },
+          keySeparator: false,
+          nsSeparator: false,
+        },
+        pages: [
+          {
+            matchPath: "/:lang?/docs/:uid",
+            getLanguageFromPath: true,
+          },
+          {
+            matchPath: "/",
+            languages: [defaultLanguage],
+          },
+        ],
+      },
+    },
+    {
       resolve: `gatsby-transformer-remark`,
       options: {
-        delims: ['<!---', '--->'],
+        delims: ["<!---", "--->"],
         plugins: [
           `gatsby-remark-autolink-headers`, // add hash links to headings
           {
@@ -69,17 +107,17 @@ module.exports = {
                 "heading[depth=1]": "title",
                 "heading[depth=2]": "subtitle",
                 // paragraph: "para",
-              }
-            }
+              },
+            },
           },
           {
             // make absolute links to relative
             resolve: "gatsby-remark-relative-links",
             options: {
               domainRegex: /http[s]*:\/\/[kenny.]*yeoyou\.net[/]?/,
-            }
+            },
           },
-          'gatsby-remark-relative-linker', // remove .md in relative links
+          "gatsby-remark-relative-linker", // remove .md in relative links
         ],
       },
     },

@@ -29,7 +29,7 @@ You can check that `df -h` has some free space but `df -hi` shows a low free spa
 
 BTW, You can prune unused file by following docker command but it would rebuild required files soon.
 
-```sh
+```bash
 docker system prune --volumes
 ```
 
