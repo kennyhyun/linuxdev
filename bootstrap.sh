@@ -279,14 +279,13 @@ else
 if ! [ -d ~/dotfiles ]; then
   echo "======= Cloning dotfiles"
   git clone --recurse-submodules $DOTFILES_REPO ~/dotfiles && \
-  init=\$(find dotfiles -maxdepth 1 -type f -executable -name 'init*') && \
-  bootstrap=\$(find dotfiles -maxdepth 1 -type f -executable -name 'bootstrap*') && \
+  init=\$(find dotfiles -maxdepth 1 -type f -executable -name 'init*' \
+-o -type f -executable -name "bootstrap*" -o -type f -executable -name "setup*" \
+-o -type f -executable -name "install*" \
+|head -n 1) && \
   if [ -f "\$init" ]; then
     \$init
     echo "======= Ran \$init ($?)"
-  elif [ -f "\$bootstrap" ]; then
-    \$bootstrap
-    echo "======= Ran \$bootstrap ($?)"
   else
     echo "!!!! could not find init script. please run manually"
   fi
