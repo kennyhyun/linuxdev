@@ -134,7 +134,7 @@ Now you can ssh into Linux dev env
 ssh linuxdev
 ```
 
-A additional external configuration [dotfiles project like this](https://github.com/kennyhyun/dotfiles) can be added 
+An additional external configuration [dotfiles project like this](https://github.com/kennyhyun/dotfiles) can be added 
 
 If DOTFILES_REPO has been defined in `.env`, it clones it to ~/dotfiles and try to run
 
