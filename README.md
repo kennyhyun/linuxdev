@@ -134,11 +134,16 @@ Now you can ssh into Linux dev env
 ssh linuxdev
 ```
 
-Run `/vagrant/init_dotfiles.sh` to continue setting up dotfiles in ssh.
+An additional external configuration [dotfiles project like this](https://github.com/kennyhyun/dotfiles) can be added 
 
-It installs basic devtools from external [dotfiles project](https://github.com/kennyhyun/dotfiles)
+If DOTFILES_REPO has been defined in `.env`, it clones it to ~/dotfiles and try to run
 
-You can override repo by `DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git`
+- bootstrap*
+- init*
+- install*
+- setup*
+
+any of files which is executable.
 
 ### [Useful Commands](./docs/tips.md)
 
