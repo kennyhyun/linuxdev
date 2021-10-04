@@ -1,0 +1,5 @@
+{
+    "componentChunkName": "component---src-pages-404-js",
+    "path": "/ko/404.html",
+    "result": {"data":{"site":{"siteMetadata":{"title":"Linuxdev Documentation"}}},"pageContext":{"language":"ko","i18n":{"language":"ko","languages":["en","ko","ja"],"defaultLanguage":"en","generateDefaultLanguagePage":false,"routed":true,"originalPath":"/404.html","path":"ko/404.html"}}},
+    "staticQueryHashes": ["3347749741"]}

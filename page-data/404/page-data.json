@@ -1,5 +1,5 @@
 {
     "componentChunkName": "component---src-pages-404-js",
     "path": "/404/",
-    "result": {"data":{"site":{"siteMetadata":{"title":"Linuxdev Documentation"}}},"pageContext":{}},
+    "result": {"data":{"site":{"siteMetadata":{"title":"Linuxdev Documentation"}}},"pageContext":{"language":"en","i18n":{"language":"en","languages":["en","ko","ja"],"defaultLanguage":"en","generateDefaultLanguagePage":false,"routed":false,"originalPath":"/404/","path":"/404/"}}},
     "staticQueryHashes": ["3347749741"]}
