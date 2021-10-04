@@ -1,6 +1,12 @@
 import * as React from "react"
 import { Link, useI18next } from "gatsby-plugin-react-i18next"
 
+const languageLabel = {
+  en: "English",
+  ja: "日本語",
+  ko: "한글",
+}
+
 const Layout = ({ location, title, children }) => {
   const rootPath = `${__PATH_PREFIX__}/`
   const isRootPath = location.pathname === rootPath
@@ -10,7 +16,7 @@ const Layout = ({ location, title, children }) => {
       {languages.map(lng => (
         <li key={lng}>
           <Link to={originalPath} language={lng}>
-            {lng}
+            {languageLabel[lng]}
           </Link>
         </li>
       ))}
