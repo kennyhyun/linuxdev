@@ -294,7 +294,7 @@ if ! [ -d ~/dotfiles ]; then
 |head -n 1) && \
   if [ -f "\$init" ]; then
     \$init
-    echo "======= Ran \$init ($?)"
+    echo "======= Ran \$init (\$?)"
   else
     echo "!!!! could not find init script. please run manually"
   fi
