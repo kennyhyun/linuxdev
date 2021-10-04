@@ -1,6 +1,6 @@
 import * as React from "react"
 import { graphql } from "gatsby"
-import { Link, useTranslation } from 'gatsby-plugin-react-i18next';
+import { Link, useTranslation } from "gatsby-plugin-react-i18next"
 import { DiscussionEmbed } from "disqus-react"
 
 import Bio from "../components/bio"
@@ -19,8 +19,8 @@ const BlogPostTemplate = ({ data, location }) => {
       } = {},
     },
   } = data
-  const { title, description, date } = post.frontmatter;
-  const { fields: { slug, language } = {} } = post;
+  const { title, description, date } = post.frontmatter
+  const { fields: { slug, language } = {} } = post
   const disqusConfig = {
     shortname: disqusShortName,
     config: { identifier: slug, title },
@@ -28,10 +28,7 @@ const BlogPostTemplate = ({ data, location }) => {
 
   return (
     <Layout location={location} title={siteTitle}>
-      <Seo
-        title={title}
-        description={description || post.excerpt}
-      />
+      <Seo title={title} description={description || post.excerpt} />
       <article
         className="blog-post"
         itemScope
@@ -52,32 +49,34 @@ const BlogPostTemplate = ({ data, location }) => {
         <DiscussionEmbed {...disqusConfig} />
       </article>
       <hr />
-      <nav className="blog-post-nav">
-        <ul
-          style={{
-            display: `flex`,
-            flexWrap: `wrap`,
-            justifyContent: `space-between`,
-            listStyle: `none`,
-            padding: 0,
-          }}
-        >
-          <li>
-            {previous && (
-              <Link to={previous.fields.slug} rel="prev">
-                ← {previous.frontmatter.title}
-              </Link>
-            )}
-          </li>
-          <li>
-            {next && (
-              <Link to={next.fields.slug} rel="next">
-                {next.frontmatter.title} →
-              </Link>
-            )}
-          </li>
-        </ul>
-      </nav>
+      {!language && (
+        <nav className="blog-post-nav">
+          <ul
+            style={{
+              display: `flex`,
+              flexWrap: `wrap`,
+              justifyContent: `space-between`,
+              listStyle: `none`,
+              padding: 0,
+            }}
+          >
+            <li>
+              {previous && (
+                <Link to={previous.fields.slug} rel="prev">
+                  ← {previous.frontmatter.title}
+                </Link>
+              )}
+            </li>
+            <li>
+              {next && (
+                <Link to={next.fields.slug} rel="next">
+                  {next.frontmatter.title} →
+                </Link>
+              )}
+            </li>
+          </ul>
+        </nav>
+      )}
     </Layout>
   )
 }
