@@ -95,6 +95,7 @@ ssh="ssh -F $SSH_CONFIG.root root"
 
 docker_port=${DOCKER_PORT:-2376}
 ip_address=${IP_ADDRESS:-192.168.99.123}
+$ssh "touch ~/.hushlogin"
 
 if [ -z "$exists" ]; then
   echo "user $username not found"
@@ -184,6 +185,8 @@ fi
 
 EOSSH
 
+$ssh "rm ~/.hushlogin"
+
 echo ---------------------
 if [ -z "$(grep $machine_name ~/.ssh/config)" ]; then
   echo Adding ssh config for $machine_name
@@ -192,6 +195,8 @@ else
   echo $machine_name entry found in ~/.ssh/config. Please double check if Port is correct:
   grep $machine_name ~/.ssh/config -A10|grep Port
 fi
+
+ssh $machine_name "touch ~/.hushlogin"
 
 #### user $username
 ssh $machine_name << EOSSH
@@ -231,14 +236,18 @@ docker-compose --version
 
 echo "-----\nConfiguring samba"
 mkdir -p ~/Projects
-mkdir -p samba
-cp /vagrant/config/samba/* samba/
-cd samba
-docker-compose down
-docker-compose up -d
-docker cp /etc/passwd samba:/etc/passwd
-chmod +x adduser
-./adduser \$USER
+if [ -d ~/samba ]; then
+  echo samba config is found. skipping to create
+else
+  mkdir -p samba
+  cp /vagrant/config/samba/* samba/
+  cd samba
+  docker-compose down
+  docker-compose up -d
+  docker cp /etc/passwd samba:/etc/passwd
+  chmod +x adduser
+  ./adduser \$USER
+fi
 
 if [ -f /dummy ]; then
   filesize=\$(stat -c%s "/dummy")
@@ -308,6 +317,8 @@ cat ~/.ssh/id_rsa.pub
 echo ---------------------
 
 EOSSH
+
+ssh $machine_name "rm ~/.hushlogin"
 
 mkdir -p ~/Programs
 if [ "$windows" ] && ! [ -f ~/Programs/docker_env.bat ]; then
