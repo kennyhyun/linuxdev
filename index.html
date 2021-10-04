@@ -284,9 +284,15 @@ As you noticed, Linuxdev was the best in some situation.</p>
 <p>Copy and paste ssh public key to use in Github and where ever it’s required.</p>
 <p>Now you can ssh into Linux dev env</p>
 <div class="gatsby-highlight" data-language="bash"><pre class="language-bash"><code class="language-bash"><span class="token function">ssh</span> linuxdev</code></pre></div>
-<p>Run <code class="language-text">/vagrant/init_dotfiles.sh</code> to continue setting up dotfiles in ssh.</p>
-<p>It installs basic devtools from external <a href="https://github.com/kennyhyun/dotfiles">dotfiles project</a></p>
-<p>You can override repo by <code class="language-text">DOTFILE_REPO=git@github.com:kennyhyun/dotfiles.git</code></p>
+<p>An additional external configuration <a href="https://github.com/kennyhyun/dotfiles">dotfiles project like this</a> can be added</p>
+<p>If DOTFILES_REPO has been defined in <code class="language-text">.env</code>, it clones it to ~/dotfiles and try to run</p>
+<ul>
+<li>bootstrap*</li>
+<li>init*</li>
+<li>install*</li>
+<li>setup*</li>
+</ul>
+<p>any of files which is executable.</p>
 <h3 id="useful-commands" style="position:relative;"><a href="#useful-commands" aria-label="useful commands permalink" class="anchor before"><svg aria-hidden="true" focusable="false" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a><a href="./docs/tips">Useful Commands</a></h3>
 <h2 id="demo" style="position:relative;" class="subtitle"><a href="#demo" aria-label="demo permalink" class="anchor before"><svg aria-hidden="true" focusable="false" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Demo</h2>
 <p><code class="language-text">setup.ps1</code> (Windows Powershell script; Use setup.sh for Mac)</p>
