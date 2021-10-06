@@ -1,0 +1,13 @@
+{
+  "profiles": [
+    {
+      "guid": "{__guid__}",
+      "name": "__profile_name__",
+      "bellStyle": ["window", "taskbar"],
+      "colorScheme": "Solarized Dark",
+      "commandline": "ssh -X __machine_name__",
+      "cursorShape": "vintage",
+      "icon": "__icon_file__"
+    }
+  ]
+}
