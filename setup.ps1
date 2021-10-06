@@ -5,7 +5,10 @@ if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Adm
   exit -1
 }
 
-If ($args.Contains("-nodevtools")) {
+If ($args.Contains("-noconfirm")) {
+  $noConfirm=1
+}
+If ($args.Contains("-nodevtools") -or $args.Contains("-production")) {
   $noDevTools=1
 }
 
@@ -41,7 +44,9 @@ Note: This will turn off WSL2
   git, vscode, windows terminal,
   virtualbox, vagrant
 =================================="
+if (-not $noConfirm) {
 Read-Host -Prompt "Press any key to continue or ^C to stop"
+}
 
 # Disable hyper-v
 Write-Host ---------------------------------------

@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 for param in "$@"
 do
+  if [ "$param" == "--no-confirm" ] ; then
+    no_confirm=1
+  fi
   if [ "$param" == "--no-devtools" ] ; then
     no_devtools=1
   fi
@@ -45,8 +48,10 @@ echo "=======================================
 
 git, item2, vscode, virtualbox, vagrant
 ======================================="
+if [ -z "$no_confirm" ]; then
 echo -n "> Press enter to install or ^C to stop"
 read input
+fi
 
 if [[ "$no_xcode" || $(xcode-select -p 1>/dev/null;echo $?) == "0" ]]; then
   echo Skip installing xcode-select
