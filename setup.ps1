@@ -8,7 +8,7 @@ if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Adm
 If ($args.Contains("-noconfirm")) {
   $noConfirm=1
 }
-If ($args.Contains("-nodevtools") -or $args.Contains("-production")) {
+If ($args.Contains("-nodevtools")) {
   $noDevTools=1
 }
 
