@@ -1,4 +1,42 @@
 $ErrorActionPreference = "Stop"
+$currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+  Write-Host "Please run as an administrator"
+  exit -1
+}
+
+If ($args.Contains("-noconfirm")) {
+  $noConfirm=1
+}
+If ($args.Contains("-nodevtools") -or $args.Contains("-production")) {
+  $noDevTools=1
+}
+
+If ($args.Contains("-nogit")) {
+  $noGit=1
+}
+
+If ($args.Contains("-novscode")) {
+  $noVsCode=1
+}
+
+If ($args.Contains("-noterminal")) {
+  $noTerminal=1
+}
+
+If ($args.Contains("-novagrant")) {
+  $noVagrant=1
+}
+
+If ($args.Contains("-novirtualbox")) {
+  $noVirtualBox=1
+}
+
+if ($noDevTools) {
+  $noGit=1
+  $noVsCode=1
+  $noTerminal=1
+}
 
 Write-Host "==================================
 Note: This will turn off WSL2
@@ -6,7 +44,9 @@ Note: This will turn off WSL2
   git, vscode, windows terminal,
   virtualbox, vagrant
 =================================="
+if (-not $noConfirm) {
 Read-Host -Prompt "Press any key to continue or ^C to stop"
+}
 
 # Disable hyper-v
 Write-Host ---------------------------------------
@@ -30,6 +70,7 @@ $virtualization_enabled = systeminfo |select-string "Virtualization Enabled"|out
 Write-Host Virtualization support: $virtualization_enabled
 
 # Install terminal
+If (-Not $noTerminal) {
 Write-Host ---------------------------------------
 $installed_terminal_version = (Get-AppxPackage -Name *WindowsTerminal).Version
 $terminal_url = "https://api.github.com/repos/microsoft/terminal/releases/latest"
@@ -55,9 +96,11 @@ if ($installed_terminal_version -And $terminal_asset.name -match $installed_term
   }
   Write-Host Installed Windows Terminal.
 }
+}
 
 ######################
 # Install vscode
+If (-Not $noVsCode) {
 Write-Host ---------------------------------------
 Try {
   $installed_vscode_version = code --version| select-object -First 1
@@ -93,7 +136,9 @@ if ($installed_vscode_version -And $vscode_installer_version -match $installed_v
   }
   Write-Host Installed VS Code.
 }
+}
 
+If (-Not $noGit) {
 ######################
 # run installer if git-bash not found
 Write-Host ---------------------------------------
@@ -122,7 +167,9 @@ if ($installed_git_version -And $git_asset.name -match $installed_git_version) {
   Start-Process -FilePath $installer -ArgumentList $install_args -Wait
   Write-Host Installed Git.
 }
+}
 
+If (-Not $noVirtualBox) {
 ######################
 # Install virtual box
 Write-Host ---------------------------------------
@@ -160,9 +207,11 @@ if ($installed_vbox_version -And $installed_vbox_version -match $vbox_installer_
   }
   Write-Host Installed VirtualBox.
 }
+}
 
 ######################
 # Install vagrant
+If (-Not $noVagrant) {
 Write-Host ---------------------------------------
 Try {
   $installed_vagrant_version = vagrant --version | %{$_.split(' ')[1]}
@@ -193,6 +242,7 @@ if ($installed_vagrant_version -And $installed_vagrant_version -match $vagrant_i
     Write-Host $_
   }
   Write-Host Installed Vagrant.
+}
 }
 
 Write-Host ==================================
