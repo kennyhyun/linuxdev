@@ -80,6 +80,8 @@ tlskey: server-key.pem
 tlscacert: ca.pem
 tlscert: cert.pem
 tlskey: key.pem
-
-Please run config_docker_certs.sh to apply config certificates.
 "
+
+if [ -z "$(ps aux | grep "bootstrap.sh")" ]; then
+  echo "Please run config_docker_certs.sh to apply config certificates."
+fi

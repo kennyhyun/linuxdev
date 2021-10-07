@@ -52,7 +52,9 @@ if [ -z "$DOTFILES_REPO" ]; then
   echo -n "> Please enter the dotfiles repo (try https://github.com/kennyhyun/dotfiles.git if you don't have one):"
   read input
   DOTFILES_REPO=$input
-  echo "DOTFILES_REPO=${input}">> .env
+  if [ "$input" ]; then
+    echo "DOTFILES_REPO=${input}">> .env
+  fi
 fi
 
 echo =================================
@@ -224,21 +226,30 @@ fi
 
 if [ -f /usr/local/bin/docker-compose ]; then
   echo "-----\ndocker-compose aleady exists"
+  docker-compose --version
 else
   echo "-----\nInstalling docker-compose...."
-  docker_compose_url=https://github.com\$(wget -q -O - https://github.com/docker/compose/releases/latest | sed -n 's/.*href="\([^"]*\).*/\1/p'|grep "\$(uname -s)-\$(uname -m)$")
-  echo docker_compose_url: \$docker_compose_url
-  sudo wget \$docker_compose_url -O /usr/local/bin/docker-compose
-  sudo chmod +x /usr/local/bin/docker-compose
   sudo pip3 install requests --upgrade
+  dc_binary_type=\$(uname -s)-\$(uname -m)
+  github_compose_release_url=https://github.com/docker/compose/releases/latest
+  urls=\$( wget -q -O - \$github_compose_release_url | sed -n 's/.*href="\([^"]*\).*/\1/p')
+  latest_dc_version_url=\$(echo \$urls | grep -i "\$dc_binary_type$" )
+  if [ -z "\$latest_dc_version_url" ];then
+    echo "Could not find the docker-compose url, please install manually from \$github_compose_release_url"
+  else
+    docker_compose_url=https://github.com\${latest_dc_version_url}
+    echo Downloading: \$docker_compose_url
+    sudo wget \$docker_compose_url -O /usr/local/bin/docker-compose -q --show-progress --progress=bar:force
+    sudo chmod +x /usr/local/bin/docker-compose
+    docker-compose --version
+  fi
 fi
-docker-compose --version
 
-echo "-----\nConfiguring samba"
 mkdir -p ~/Projects
 if [ -d ~/samba ]; then
-  echo samba config is found. skipping to create
+  echo "-----\nSamba config is found. skipping to create"
 else
+  echo "-----\nConfiguring samba"
   mkdir -p samba
   cp /vagrant/config/samba/* samba/
   cd samba
@@ -260,11 +271,12 @@ fi
 EOSSH
 
 if [ -d ~/.docker/certs.$machine_name ]; then
-  echo "~/.docker/certs.$machine_name already exists, skip creating Docker certs"
+  echo "--------
+~/.docker/certs.$machine_name already exists, skip creating Docker certs"
 else
   echo "--------
 Creating Docker certs"
-  ssh $machine_name mv linuxdev.certs linuxdev.certs.backup || echo ""
+  ssh $machine_name "mv linuxdev.certs linuxdev.certs.backup 2> /dev/null || echo \"\""
   ssh $machine_name /vagrant/create_docker_certs.sh
   mkdir -p ~/.docker/certs.$machine_name
   cp ./certs/*.pem ~/.docker/certs.$machine_name/
@@ -282,7 +294,8 @@ fi
 
 #### init dotfiles
 if [ -z "$DOTFILES_REPO" ]; then
-  echo "DOTFILES_REPO is not defined. skipping"
+  echo "---------
+DOTFILES_REPO is not defined. skipping"
 else
   ssh $machine_name << EOSSH
 if ! [ -d ~/dotfiles ]; then
@@ -325,7 +338,12 @@ if [ "$windows" ]; then
  # add Windows Terminal Profile
  powershell ./add-machine-profile.ps1 $machine_name
 
- if ! [ -f ~/Programs/docker_env.bat ]; then
+ if [ -f ~/Programs/docker_env.bat ]; then
+  echo "-----
+The docker environment is already set. delete ~/Programs/docker_env.bat and try again if you want to reconfigure"
+ else
+  echo "-----
+Setting Docker Environment Variables for Windows. Please check DOCKER_HOST and related ones if you want to use other environments"
   powershell ./add-programs-to-path.ps1
   echo "@echo off
 set DOCKER_CERT_PATH=%userprofile%\.docker\certs.$machine_name
