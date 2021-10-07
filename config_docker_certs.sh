@@ -13,6 +13,7 @@ fi
 
 docker_port=${DOCKER_PORT:-2376}
 
+echo config_docker_certs.sh: Configuring docker server for the certificates
 service docker stop
 
 mkdir -p /etc/systemd/system/docker.service.d/

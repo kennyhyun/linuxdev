@@ -134,6 +134,8 @@ Now you can ssh into Linux dev env
 ssh linuxdev
 ```
 
+For Windows Terminal, there is also a profile generated for the machine.
+
 An additional external configuration [dotfiles project like this](https://github.com/kennyhyun/dotfiles) can be added 
 
 If DOTFILES_REPO has been defined in `.env`, it clones it to ~/dotfiles and try to run
@@ -144,6 +146,26 @@ If DOTFILES_REPO has been defined in `.env`, it clones it to ~/dotfiles and try 
 - setup*
 
 any of files which is executable.
+
+### Setup parameters
+
+```powershell
+.\setup.ps1 -nodevtools
+```
+
+or
+
+```bash
+./setup.sh --no-devtools
+```
+
+will skip installing git, vscode, and terminal.
+
+`--no-{vscode,git,vagrant,virtualbox,...}` is also available
+
+** git should be required for Windows to run git-bash
+
+** you can still install it manually with `--no-git` parameter
 
 ### [Useful Commands](./docs/tips.md)
 

@@ -161,7 +161,7 @@ if ($installed_git_version -And $git_asset.name -match $installed_git_version) {
     Invoke-WebRequest -UseBasicParsing -Uri $git_asset.browser_download_url -OutFile $installer
   }
   # install git
-  $git_install_inf = "$PSScriptRoot\git.inf"
+  $git_install_inf = "$PSScriptRoot\config\git.inf"
   $install_args = "/SP- /SILENT /SUPPRESSMSGBOXES /NOCANCEL /NORESTART /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /LOADINF=""$git_install_inf"""
   Write-Host Installing $installer, $install_args
   Start-Process -FilePath $installer -ArgumentList $install_args -Wait
