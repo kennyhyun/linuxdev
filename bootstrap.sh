@@ -276,7 +276,6 @@ if [ -d ~/.docker/certs.$machine_name ]; then
 else
   echo "--------
 Creating Docker certs"
-  ssh $machine_name "mv linuxdev.certs linuxdev.certs.backup 2> /dev/null || echo \"\""
   ssh $machine_name /vagrant/create_docker_certs.sh
   mkdir -p ~/.docker/certs.$machine_name
   cp ./certs/*.pem ~/.docker/certs.$machine_name/
