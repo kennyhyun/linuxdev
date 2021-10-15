@@ -3,9 +3,11 @@ title: Configuring VM
 date: 2021-10-15
 --->
 
+# Configuring the VM
+
 You can create .env to customize the VM environment. Bootstrap interactively inputs the required values with some default values.
 
-### Name
+## Name
 
 ```
 NAME=awesome-name
@@ -13,7 +15,7 @@ NAME=awesome-name
 
 This will rename the machine name in VirtualBox. run `vagrant reload` to apply when updated.
 
-### Cpus and memory
+## Cpus and memory
 
 ```
 CPUS=4
@@ -22,7 +24,7 @@ MEMORY=8192
 
 This will adjust cpus and memory, run `vagrant reload` to apply when updated.
 
-### Expand disk size
+## Expand disk size
 
 ```
 EXPAND_DISK_GB=10
@@ -37,7 +39,7 @@ And you will have some slowness on the VM for a while but would not be slow whil
 This should be setup before running bootstrap.
 Or you can retry after removing `/dummy`
 
-### Docker lib disk
+## Docker lib disk
 
 ```
 DOCKER_DISK_SIZE_GB=45
