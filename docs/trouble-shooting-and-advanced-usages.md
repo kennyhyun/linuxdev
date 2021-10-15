@@ -35,3 +35,12 @@ To avoid deletion of the storage attached,
 Clone this repo in the other directory and use different machine name during `bootstrap.sh`
 
 You will need to manage DOCKER_xxx variables manually
+
+## Creating machine failed
+
+Find `%USERPROFILE%\VirualBox VMs\<machine_name>\Logs` and try to delete.
+If it cannot be deleted, see the Task Manager and 
+
+![image](https://user-images.githubusercontent.com/5399854/137558547-1dc16fcf-6484-4482-bb4b-abd27bde586e.png)
+
+End tasks for `VirtualBox Headless Frontend` and try to remove the Logs directory and try again.
