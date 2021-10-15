@@ -29,7 +29,7 @@ and it shares Projects directory so Host machine can see the files in it.
 \\192.168.99.123\Projects
 ```
 
-** Windows git global config should turn filemode off
+** Windows git global config should have filemode turned off
 
 
 ## Docker Storage
