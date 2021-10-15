@@ -93,7 +93,7 @@ As you noticed, Linuxdev was the best in some situation.
 ## Setting up the Linuxdev environment
 
 ### ⚠ Note for Windows users
-The script will disable Hyper-v (WSL2) but you can still use docker cli
+The script will disable Hyper-v (WSL2) and replace with VM and you can also use Docker from the host OS
 
 ### Running scripts
 
