@@ -32,7 +32,7 @@ Vagrant.configure("2") do |config|
   # within the machine from a port on the host machine and only allow access
   # via 127.0.0.1 to disable public access
   # config.vm.network "forwarded_port", guest: 80, host: 8080, host_ip: "127.0.0.1"
-  config.vm.network "forwarded_port", guest: 443, host: 443, host_ip: "127.0.0.1"
+  config.vm.network "forwarded_port", guest: 443, host: 443, host_ip: "0.0.0.0"
 
   # Create a private network, which allows host-only access to the machine
   # using a specific IP.
@@ -50,7 +50,16 @@ Vagrant.configure("2") do |config|
   # argument is a set of non-required options.
   # config.vm.synced_folder "../data", "/vagrant_data"
   config.vm.synced_folder "./data", "/mnt/data"
- 
+  dynamic_synced_folders = (ENV['HOST_PATHS'] || "").split(',')
+  dynamic_synced_folders.each { |host_path|
+    abs_path = File.expand_path(host_path)
+    # windows drive path conversion
+    abs_path = abs_path.sub!(/^([a-zA-Z]):\//){ '/' + $1.downcase + '/' }
+    # use only for debug: vagrant ssh-config will have this too
+    # puts "Adding synced_folder: " + host_path + ':' + abs_path
+    config.vm.synced_folder host_path, abs_path, create: true
+  }
+
   # Provider-specific configuration so you can fine-tune various
   # backing providers for Vagrant. These expose provider-specific options.
   # Example for VirtualBox:
@@ -88,6 +97,7 @@ Vagrant.configure("2") do |config|
   #   apt-get install -y apache2
   # SHELL
   #config.vm.provision "file", source: "./.vagrant/machines/default/virtualbox/private_key", destination: "$HOME/.ssh/id_rsa"
+  config.vm.provision "shell", inline: "echo '. /vagrant/config/env_var.sh' > /etc/profile.d/env_var.sh", run: "always"
   config.vm.provision "docker",
     images: ["stanback/alpine-samba", "docker/dockerfile:1.0-experimental"]
 end

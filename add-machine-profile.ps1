@@ -12,6 +12,19 @@ $machine_title=(Get-Culture).TextInfo.ToTitleCase($machine_name)
 $PROFILE_DIR="$HOME\AppData\Local\Microsoft\Windows Terminal\Fragments\$machine_title"
 New-Item -ItemType Directory -Force -Path $PROFILE_DIR | Out-Null
 
+# add autostart shortcut
+$WshShell = New-Object -comObject WScript.Shell
+$ShortcutPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\start_$machine_name.lnk"
+if (Test-Path -Path "$ShortcutPath" -PathType Leaf) {
+  write-host $ShortcutPath already exists
+} else {
+  $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
+  $Shortcut.TargetPath = "vagrant"
+  $Shortcut.Arguments = "up"
+  $Shortcut.WorkingDirectory = "$PSScriptRoot"
+  $Shortcut.Save()
+}
+
 ######################
 # read json and create the updated profile
 $PROFILE_FILE="$HOME\AppData\Local\Microsoft\Windows Terminal\Fragments\$machine_title\$machine_name.json"

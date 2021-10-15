@@ -32,8 +32,15 @@ If ($args.Contains("-novirtualbox")) {
   $noVirtualBox=1
 }
 
+If ($args.Contains("-withvagrantmanager")) {
+  $withVagrantManager=1
+}
+
+If ($args.Contains("-nohyperv")) {
+  $noHyperv=1
+}
+
 if ($noDevTools) {
-  $noGit=1
   $noVsCode=1
   $noTerminal=1
 }
@@ -48,6 +55,7 @@ if (-not $noConfirm) {
 Read-Host -Prompt "Press any key to continue or ^C to stop"
 }
 
+if (-not $noHyperv) {
 # Disable hyper-v
 Write-Host ---------------------------------------
 Write-Host " Disabling Hypervisor Platform"
@@ -65,30 +73,53 @@ Try {
   Write-Host hypervisor platform not found
 }
 bcdedit /set hypervisorlaunchtype off
+}
 $virtualization_enabled = systeminfo |select-string "Virtualization Enabled"|out-string|%{$_.SubString($_.IndexOf(': ')+1).trim()}
 
 Write-Host Virtualization support: $virtualization_enabled
+
+function get_github_release_url {
+  param($url, $pattern)
+  $asset = Invoke-RestMethod -Method Get -Uri "$url" | % assets | where name -like "$pattern"
+  return @{"url" = $($asset.browser_download_url); "name" = $($asset.name)}
+}
+
+function download_from_installer_url {
+  param ($url, $filename)
+  if (-not $filename) {
+    $filename = $url.split("=/?")[-1]
+  }
+  #write-host "Download-from-installer-url: $url, $filename"
+  $temp_file = "$env:temp\$filename"
+  if (-not $filename -and $temp_file -notmatch ".exe") {
+    $temp_file = "$temp_file.exe"
+  }
+  if (Test-Path($temp_file)) {
+    Write-Host Found $temp_file, skip downloading
+  } else {
+    Invoke-WebRequest -UseBasicParsing -Uri "$url" -OutFile $temp_file
+  }
+  return $temp_file
+}
+
+function download_github_release_installer {
+  param($url, $pattern)
+  $asset = get_github_release_url -url "$url" -pattern "$pattern"
+  $installer = download_from_installer_url -url $asset.url
+  return $installer
+}
 
 # Install terminal
 If (-Not $noTerminal) {
 Write-Host ---------------------------------------
 $installed_terminal_version = (Get-AppxPackage -Name *WindowsTerminal).Version
-$terminal_url = "https://api.github.com/repos/microsoft/terminal/releases/latest"
-$terminal_asset = Invoke-RestMethod -Method Get -Uri $terminal_url | % assets | where name -like "*msixbundle"
-$terminal_installer = "$env:temp\$($terminal_asset.name)"
+$terminal_asset = get_github_release_url -url "https://api.github.com/repos/microsoft/terminal/releases/latest" -pattern "*msixbundle"
 Write-Host $terminal_asset.name
 if ($installed_terminal_version -And $terminal_asset.name -match $installed_terminal_version) {
   Write-Host already installed
 } else {
-  # download installer unless exists
-  if (Test-Path($terminal_installer)) {
-    Write-Host Found $terminal_installer, skip downloading
-  } Else {
-    Write-Host Downloading $terminal_asset.browser_download_url
-    Invoke-WebRequest -UseBasicParsing -Uri $terminal_asset.browser_download_url -OutFile $terminal_installer
-  }
-  # Install terminal
-  Write-Host Installing $terminal_asset.name
+  Write-Host "Installing $terminal_asset.name (installed: $installed_terminal_version)"
+  $terminal_installer = download_from_installer_url -url $terminal_asset.url -filename $terminal_asset.name
   Try {
     Add-AppPackage -path $terminal_installer
   } catch {
@@ -96,6 +127,23 @@ if ($installed_terminal_version -And $terminal_asset.name -match $installed_term
   }
   Write-Host Installed Windows Terminal.
 }
+}
+
+# Install vagrant manager
+If ($withVagrantManager) {
+  Write-Host ---------------------------------------
+  $vmanager_location1="$env:ProgramFiles (x86)\Vagrant Manager\VagrantManager.exe"
+  $vmanager_location2="$env:LOCALAPPDATA\Programs\Vagrant Manager\VagrantManager.exe"
+  If ((Test-Path $vmanager_location1) -or (Test-Path $vmanager_location2)) {
+    Write-Host Vagrant Manager is already installed
+  } else {
+    Write-Host Installing Vagrant Manager
+    $vmanager_installer = download_github_release_installer -url "https://api.github.com/repos/lanayotech/vagrant-manager-windows/releases/latest" -pattern "*.exe"
+    $install_args = "/SP- /SILENT /NOCANCEL /NORESTART /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS"
+    Write-Host Installing $vmanager_installer, $install_args
+    Start-Process -FilePath $vmanager_installer -ArgumentList $install_args
+    Write-Host Installed Vagrant Manager.
+  }
 }
 
 ######################
@@ -145,26 +193,17 @@ Write-Host ---------------------------------------
 Try {
   $installed_git_version = git --version | %{$_.split(' ')[-1]} | %{$_.SubString(0, $_.IndexOf('.windows'))}
 } catch {}
-$git_url = "https://api.github.com/repos/git-for-windows/git/releases/latest"
-$git_asset = Invoke-RestMethod -Method Get -Uri $git_url | % assets | where name -like "*64-bit.exe"
-$git_installer = "$env:temp\$($git_asset.name)"
-
-Write-Host $git_asset.name
+$git_asset = get_github_release_url -url "https://api.github.com/repos/git-for-windows/git/releases/latest" -pattern "*64-bit.exe"
+Write-Host "$git_asset.name (installed: $installed_git_version)"
 if ($installed_git_version -And $git_asset.name -match $installed_git_version) {
   Write-Host already installed
 } Else {
   # download installer unless exists
-  $installer = "$env:temp\$($git_asset.name)"
-  if (Test-Path($installer)) {
-    Write-Host Found $installer, skip downloading
-  } Else {
-    Invoke-WebRequest -UseBasicParsing -Uri $git_asset.browser_download_url -OutFile $installer
-  }
-  # install git
+  $git_installer = download_from_installer_url -url $git_asset.url -name $git_asset.name
   $git_install_inf = "$PSScriptRoot\config\git.inf"
-  $install_args = "/SP- /SILENT /SUPPRESSMSGBOXES /NOCANCEL /NORESTART /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /LOADINF=""$git_install_inf"""
-  Write-Host Installing $installer, $install_args
-  Start-Process -FilePath $installer -ArgumentList $install_args -Wait
+  $install_args = "/SP- /SILENT /NOCANCEL /NORESTART /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /LOADINF=""$git_install_inf"""
+  Write-Host Installing $git_installer, $install_args
+  Start-Process -FilePath $git_installer -ArgumentList $install_args -Wait
   Write-Host Installed Git.
 }
 }
