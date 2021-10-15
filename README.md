@@ -177,6 +177,7 @@ any of files which is executable.
 - Windows Terminal (Windows)
 - iterm2 (Mac)
 - gnu-sed (Mac)
+- and so on...
 
 ### Packages covered by bootstrap (VM)
 
@@ -188,6 +189,7 @@ any of files which is executable.
 - oh-my-zsh
 - vim-gtk (for vim-python3)
 - dnsutils
+- and so on...
 
 ## [Tips](./docs/tips.md)
 
