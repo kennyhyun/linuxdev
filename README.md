@@ -114,8 +114,9 @@ The script will disable Hyper-v (WSL2) and replace with VM and you can also use 
             - continue to run `bootstrap.sh`
 1. Wait until bootstrap.sh does
     - input username to use in the VM
-    - Install latest Debian Linux
-    - Install Docker
+    - Install Debian Linux 10.10
+    - Install Docker v20.10.8 (configurable in config/env_var.sh; remove VERSION if you want the latest)
+    - Install docker-compose (v1.29.2; configurable in .env `__VM__COMPOSE_VERSION`)
     - Create a user with UID 1000 and sudoer
     - ohmyzsh
     - expose samba share, `Projects`
