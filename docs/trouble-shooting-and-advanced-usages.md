@@ -17,11 +17,21 @@ date: 2021-10-15
 
 `vagrant destory` will remove all the VM storage attached.
 
+To avoid deletion of the storage attached, 
+
 1. Shutdown the VM first with `vagrant halt`
 2. dettach the disk using Virtualbox
-  1. Open Oracle VM VirtualBox
-  2. In Tools > Media, identify docker.xx.vdi in the right pane, which is used in the VM
-  3. right click and click Release
+    1. Open Oracle VM VirtualBox
+![image](https://user-images.githubusercontent.com/5399854/137492415-55e4939a-e0fc-4b2c-9310-0c80cc0a4835.png)
+    2. In Tools > Media, identify docker.xx.vdi in the right pane, which is used in the VM
+    3. right click and click Release
+![image](https://user-images.githubusercontent.com/5399854/137492552-765d1f06-52e9-4c98-b7ed-8b153c3fd7db.png)
 3. destroy the VM running `./destroy.sh` in linuxdev dir
 4. bootstrap.sh
 5. run `sudo /root/docker.disk.sh /dev/sdb1` to attach the storage
+
+## Want to create another VM
+
+Clone this repo in the other directory and use different machine name during `bootstrap.sh`
+
+You will need to manage DOCKER_xxx variables manually
