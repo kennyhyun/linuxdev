@@ -20,7 +20,7 @@ Please use install-docker-clients script if you don't have docker clients instal
 
 [Vagrant Manager](https://www.vagrantmanager.com/) would be nice to have. 
 
-## docker storage
+## Docker Storage
 
 Docker tend to use many small files especially for node.js projects
 
