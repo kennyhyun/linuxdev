@@ -20,7 +20,7 @@ Please use install-docker-clients script if you don't have docker clients instal
 
 [Vagrant Manager](https://www.vagrantmanager.com/) would be nice to have. Try setup.ps1 with `-withvagrantmanager`
 
-## Map network drive from the machine
+## Mapping network drive from the machine
 
 Virtualbox machine has IP of 192.168.99.123 by default
 and it shares Projects directory so Host machine can see the files in it.
@@ -30,6 +30,25 @@ and it shares Projects directory so Host machine can see the files in it.
 ```
 
 ** Windows git global config should have filemode turned off
+
+
+## Setup parameters
+
+```powershell
+.\setup.ps1 -nodevtools
+```
+
+or
+
+```bash
+./setup.sh --no-devtools
+```
+
+will skip installing git(for Mac), vscode, and terminal.
+
+`--no-{vscode,git,vagrant,virtualbox,...}` is also available
+
+** git should be required for Windows to run git-bash
 
 
 ## Docker Storage
