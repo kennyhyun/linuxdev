@@ -12,7 +12,7 @@ Vagrant.configure("2") do |config|
 
   # Every Vagrant development environment requires a box. You can search for
   # boxes at https://vagrantcloud.com/search.
-  config.vm.box = "bento/debian-10.10"
+  config.vm.box = ENV['VM_BOX'] || "bento/debian-10.10"
   config.vm.box_version = "202107.08.0"
 
   config.env.enable # plugin vagrant-env
@@ -32,12 +32,19 @@ Vagrant.configure("2") do |config|
   # within the machine from a port on the host machine and only allow access
   # via 127.0.0.1 to disable public access
   # config.vm.network "forwarded_port", guest: 80, host: 8080, host_ip: "127.0.0.1"
-  config.vm.network "forwarded_port", guest: 443, host: 443, host_ip: "0.0.0.0"
+  forwarded_ports = (ENV['FORWARDED_PORTS'] || "443").split(',')
+  forwarded_ports.each { |forwarded_port|
+    port = forwarded_port.to_i
+    config.vm.network "forwarded_port", guest: port, host: port, host_ip: "0.0.0.0"
+  }
 
   # Create a private network, which allows host-only access to the machine
   # using a specific IP.
   # config.vm.network "private_network", ip: "192.168.33.10"
-  config.vm.network "private_network", ip: "192.168.99.123"
+  private_networks = (ENV['PRIVATE_NETWORKS'] || "192.168.99.123").split(',')
+  private_networks.each { |private_network|
+    config.vm.network "private_network", ip: private_network
+  }
 
   # Create a public network, which generally matched to bridged network.
   # Bridged networks make the machine appear as another physical device on
@@ -53,7 +60,7 @@ Vagrant.configure("2") do |config|
   dynamic_synced_folders = (ENV['HOST_PATHS'] || "").split(',')
   dynamic_synced_folders.each { |host_path|
     abs_path = File.expand_path(host_path)
-    # windows drive path conversion
+    # windows drive path conversion C:/ => /c/
     abs_path = abs_path.sub!(/^([a-zA-Z]):\//){ '/' + $1.downcase + '/' }
     # use only for debug: vagrant ssh-config will have this too
     # puts "Adding synced_folder: " + host_path + ':' + abs_path
