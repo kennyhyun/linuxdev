@@ -57,7 +57,7 @@ Vagrant.configure("2") do |config|
   # argument is a set of non-required options.
   # config.vm.synced_folder "../data", "/vagrant_data"
   config.vm.synced_folder "./data", "/mnt/data"
-  dynamic_synced_folders = (ENV['HOST_PATHS'] || "").split(',')
+  dynamic_synced_folders = (ENV['HOST_PATHS'] || "~/Projects").split(',')
   dynamic_synced_folders.each { |host_path|
     abs_path = File.expand_path(host_path)
     # windows drive path conversion C:/ => /c/
