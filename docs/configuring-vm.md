@@ -56,3 +56,68 @@ Please note that creating a fixed size image can take a few minutes, but maybe l
 This has no default value so it uses the dynamic sized system disk image (maximum 60GB).
 
 If you had some data left in the system disk docker libs, you can see that by 1. stop docker, 2. unmounting /var/lib/docker, 3. start docker again. You can also delete that after unmounting if you don't need that any more. 
+
+## docker-compose version
+
+```
+COMPOSE_VERSION=1.29.2
+```
+
+Downloads docker-compose from `https://github.com/docker/compose/releases/download/\${dc_version}/docker-compose-$(uname -s)-$(uname -m)`
+
+## Share host directories
+
+You can add shared directory by envionment variables. You will need to `vagrat reload`
+
+```
+HOST_PATHS=~/Projects,C:\ProgramData
+```
+
+If you use **docker** in the host OS and binding volumes, the source volume should be in the HOST_PATHS
+
+If the path does not exist, it creates a blank directory and shares
+
+
+## Setting VM environment variables
+
+If you want to set VM environment variables by the host .env file, use `__VM__` prefix
+
+```
+__VM__VERSION=1.2.3
+```
+
+Will set
+
+```
+VERSION=1.2.3
+```
+
+in the VM
+
+## Setting VM hosts entries
+
+If you want to add some hosts entry from the host `.env` file, use `__VMHOSTS__` prefix
+
+```
+__VMHOSTS__127_0_0_1=somehost
+```
+
+Note that underscores (`_`) will be replaced to `.`.
+
+Will addd
+
+```
+127.0.0.1 somehost
+```
+
+to `/etc/hosts` in the VM
+
+If you need multiple enrties with the same IP address, you will need some suffix to distinguish enrties
+
+```
+__VMHOSTS__127_0_0_1=somehost
+__VMHOSTS__127_0_0_1_a=anotherhost
+__VMHOSTS__127_0_0_1_t=theotherhost
+```
+
+Anything after 4th underscore is ignored
