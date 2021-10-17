@@ -87,6 +87,10 @@ fi
 $ssh sudo cp -a /home/vagrant/.ssh /root/
 $ssh sudo chown -R root:root /root/.ssh
 
+if [ -z "$(grep root $SSH_CONFIG.user)" ]; then
+$sed -e '0,/vagrant/{s/vagrant/'$username'/}' -e '0,/default/{s/default/'$machine_name/'}' $SSH_CONFIG >> $SSH_CONFIG.user
+fi
+
 if [ -z "$(grep root $SSH_CONFIG.root)" ]; then
   $sed -e '0,/vagrant/{s/vagrant/root/}' -e '0,/default/{s/default/root/}' $SSH_CONFIG >> $SSH_CONFIG.root
 fi
@@ -204,8 +208,7 @@ $ssh "rm ~/.hushlogin"
 echo ---------------------
 if [ -z "$(grep -w "Host $machine_name" ~/.ssh/config)" ]; then
   echo Adding ssh config for $machine_name
-  ssh_config_for_the_machine=$($sed -e "0,/vagrant/{s/vagrant/$username/}" -e "0,/default/{s/default/$machine_name/}" $SSH_CONFIG)
-  echo $ssh_config_for_the_machine >> ~/.ssh/config
+  cat $SSH_CONFIG.user >> ~/.ssh/config
   if [ -z "$(grep -w "Host $machine_name" $HOME/.ssh/config || echo "")" ]; then
     # if $HOME is different to ~
     echo $ssh_config_for_the_machine >> $HOME/.ssh/config

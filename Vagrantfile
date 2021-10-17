@@ -89,7 +89,7 @@ Vagrant.configure("2") do |config|
     vb.cpus = ENV['CPUS'] || 2
 
     docker_disk_size = ENV['DOCKER_DISK_SIZE_GB']
-    disk_filename = "./docker.#{docker_disk_size}.vdi"
+    disk_filename = (ENV['VMDISK_LOCATION'] || "") + "#{machine_name}.docker.#{docker_disk_size}.vdi"
     if docker_disk_size && !File.exist?(disk_filename)
       vb.customize ['createhd', '--filename', disk_filename, '--variant', 'Fixed', '--size', docker_disk_size.to_i * 1024]
       vb.customize ['storageattach', :id,  '--storagectl', 'SATA Controller', '--port', 1, '--type', 'hdd', '--medium', disk_filename]
