@@ -61,7 +61,7 @@ Vagrant.configure("2") do |config|
   dynamic_synced_folders.each { |host_path|
     abs_path = File.expand_path(host_path)
     # windows drive path conversion C:/ => /c/
-    abs_path = abs_path.sub!(/^([a-zA-Z]):\//){ '/' + $1.downcase + '/' }
+    abs_path = abs_path.sub(/^([a-zA-Z]):\//){ '/' + $1.downcase + '/' }
     # use only for debug: vagrant ssh-config will have this too
     # puts "Adding synced_folder: " + host_path + ':' + abs_path
     config.vm.synced_folder host_path, abs_path, create: true
