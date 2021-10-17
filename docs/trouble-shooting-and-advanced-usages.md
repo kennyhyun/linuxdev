@@ -44,3 +44,21 @@ If it cannot be deleted, see the Task Manager and
 ![image](https://user-images.githubusercontent.com/5399854/137558547-1dc16fcf-6484-4482-bb4b-abd27bde586e.png)
 
 End tasks for `VirtualBox Headless Frontend` and try to remove the Logs directory and try again.
+
+## OSX Big Sur
+
+VirtualBox fails to add host-only network when it's not allowed in the `Security & Privacy`
+
+![image](https://user-images.githubusercontent.com/5399854/137605674-07023bcc-cd73-4159-9c9c-bcd3220611e1.png)
+
+Without this, creating VM using Vagrant won't work.
+
+### Version 11.4?
+
+I had some issue with granting the Virtualbox kernel extension, which was keep asking the permission after rebooting. Allowing actually was not working.
+
+The issue was fixed I upgrade OSX to 16.
+
+If you have 11.4, please consider upgrade to 11.6 or the latest.
+
+
