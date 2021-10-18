@@ -336,7 +336,9 @@ fi
 EOSSH
 fi
 
-if [ "$windows" ]; then
+if [ -z "$windows" ]; then
+  ./setup-launchd.sh
+else
   mkdir -p ~/Programs
   # add Windows Terminal Profile
   powershell ./add-machine-profile.ps1 $machine_name

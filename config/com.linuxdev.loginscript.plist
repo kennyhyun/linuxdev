@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.user.loginscript</string>
+    <string>com.linuxdev.loginscript</string>
     <key>ProgramArguments</key>
     <array>
         <string>$HOME/.startup.linuxdev.sh</string>
