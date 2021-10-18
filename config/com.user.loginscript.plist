@@ -6,7 +6,7 @@
     <string>com.user.loginscript</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/kenny/startup.sh</string>
+        <string>/Users/kenny/.startup.sh</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
