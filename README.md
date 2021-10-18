@@ -11,7 +11,7 @@ Boot up Linux development env using Vagrant
 |Performance	|<sub>. Hyper-v VM; might be slightly better but it likely consumes more memory</sub>|<sub>. Virtualbox VM; not so bad<br>. Has alternatives (Hyper-v/VMWare/Virtualbox)</sub>|
 |Environment	|<sub>Slightly different environment between<br>. Windows WSL2 (Custom distro integration required for Docker host access)<br>. Windows VM (w/o Docker host acess)<br>. Mac VM (w/o Docker host acess)</sub>|<sub>✅**Common Linux environment available in Mac/Windows<br>. Full Linux VM will be provided as a Docker host<br>  (Files can be shared natively in Linux host)<br>. Docker engine can be also accessed from the host OS<br>  (docker and docker-compose client installation required)**</sub>|
 |Installation	|<sub>Installer provided</sub>|<sub>Install scripts provided</sub>|
-|Starting Docker	|<sub>✅**Autostart configurable**</sub>|<sub>Manually by Vagrant Manager or cli<br>Startup script should be configurable</sub>|
+|Starting Docker	|<sub>**Autostart configurable**</sub>|<sub>Startup script is provided both for Windows and Mac</sub>|
 |Clients	|<sub>Provided along with the Docker Desktop installer</sub>|<sub>Install scripts provided</sub>|
 |Config	|<sub>✅**Configurable in GUI**</sub>|<sub>Configurable in script</sub>|
 |Docker storage	|<sub>Configurable size</sub>|<sub>✅**Configurable 2k block size with a lot of inodes**</sub>|
