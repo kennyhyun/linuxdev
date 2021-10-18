@@ -21,4 +21,5 @@ export PATH=/usr/local/bin:\$PATH
 cd $SCRIPT_DIR
 vagrant up
 " > ~/.startup.linuxdev.sh
+  chmod +x ~/.startup.linuxdev.sh
 fi
