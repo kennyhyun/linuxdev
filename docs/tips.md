@@ -18,9 +18,40 @@ docker is available and you will see the samba container running for the VM
 
 Please use install-docker-clients script if you don't have docker clients installed.
 
-[Vagrant Manager](https://www.vagrantmanager.com/) would be nice to have. 
+[Vagrant Manager](https://www.vagrantmanager.com/) would be nice to have. Try setup.ps1 with `-withvagrantmanager`
 
-## docker storage
+## Mapping network drive from the machine
+
+Virtualbox machine has IP of 192.168.99.123 by default
+and it shares Projects directory so Host machine can see the files in it.
+
+```
+\\192.168.99.123\Projects
+```
+
+** Windows git global config should have filemode turned off
+
+
+## Setup parameters
+
+```powershell
+.\setup.ps1 -nodevtools
+```
+
+or
+
+```bash
+./setup.sh --no-devtools
+```
+
+will skip installing git(for Mac), vscode, and terminal.
+
+`--no-{vscode,git,vagrant,virtualbox,...}` is also available
+
+** git should be required for Windows to run git-bash
+
+
+## Docker Storage
 
 Docker tend to use many small files especially for node.js projects
 
@@ -69,14 +100,4 @@ In linuxdev dir (this repo)
 ```
 
 This will create virtualbox machine and bootup and config
-
-### Map network drive from the machine
-
-Virtualbox machine has IP of 192.168.99.123 by default
-and it shares Projects directory so Host machine can see the files in it.
-
-\\192.168.99.123\Projects
-
-** Windows git global config should turn filemode off
-
     
