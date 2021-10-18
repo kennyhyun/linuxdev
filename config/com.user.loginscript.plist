@@ -6,13 +6,13 @@
     <string>com.user.loginscript</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/kenny/.startup.sh</string>
+        <string>$HOME/.startup.linuxdev.sh</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/Users/kenny/.startup.log</string>
+    <string>$HOME/.startup.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/kenny/.startup.log</string>
+    <string>$HOME/.startup.log</string>
 </dict>
 </plist>
