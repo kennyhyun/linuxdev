@@ -102,8 +102,9 @@ The script will disable Hyper-v (WSL2) and replace with VM and you can also use 
 1. Run setup scripts
     - Windows
         1. Install host dependencies and dev tools
-            - Open powershell as Admin and run `setup.ps1`
-              - `Set-ExecutionPolicy RemoteSigned` is required if you have never run
+            - Open powershell as Admin and run
+              - `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`: enables ps1 for this powersell process
+              - `setup.ps1`
             - This might require rebooting.
         1. Bootup vagrant with provision
             - Open terminal (git bash) and run `bootstrap.sh`
