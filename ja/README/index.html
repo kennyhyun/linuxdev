@@ -238,9 +238,10 @@ As you noticed, Linuxdev was the best in some situation.</p>
 <ol>
 <li>Install host dependencies and dev tools
 <ul>
-<li>Open powershell as Admin and run <code class="language-text">setup.ps1</code>
+<li>Open powershell as Admin and run
 <ul>
-<li><code class="language-text">Set-ExecutionPolicy RemoteSigned</code> is required if you have never run</li>
+<li><code class="language-text">Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass</code>: enables ps1 for this powersell process</li>
+<li><code class="language-text">setup.ps1</code></li>
 </ul>
 </li>
 <li>This might require rebooting.</li>
