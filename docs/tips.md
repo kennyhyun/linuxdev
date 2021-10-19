@@ -78,7 +78,7 @@ This vgrantfile has additional space file of 40GB and it can be configured by `D
 Right click windows menu and click Windows Powershell (Admin)
 
 ```powershell
-Set-ExecutionPolicy RemoteSigned
+Set-ExecutionPolicy Bypass
 ```
 
 Run the setup script in the directory of this repo
