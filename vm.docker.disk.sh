@@ -50,7 +50,8 @@ if [ "$(uname -s)" != "Linux" ]; then
 	exit -1
 fi
 
-if [ "$1" ~= "/dev/.d.[0-9]+" ]; then
+regex="/dev/.d.[0-9]+"
+if [[ "$1" =~ $regex ]]; then
 	echo Adding docker disk to fstab
 	add_docker_disk_to_fstab $1
 	exit 0
