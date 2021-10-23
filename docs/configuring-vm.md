@@ -94,6 +94,11 @@ VERSION=1.2.3
 
 in the VM
 
+** __VM__ZSH_THEME will set the omz theme in the VM. Please try your favorite one
+
+https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
+
+
 ## Setting VM hosts entries
 
 If you want to add some hosts entry from the host `.env` file, use `__VMHOSTS__` prefix
