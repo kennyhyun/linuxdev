@@ -60,6 +60,7 @@
 <li><code class="language-text">./destory.sh</code> to destroy the VM and start from scratch</li>
 </ul>
 <p>If you want to repeat from scratch for some reason, you can run <code class="language-text">./destroy.sh</code> and retry <code class="language-text">bootstrap.sh</code>.</p>
+<h2 id="docker" style="position:relative;" class="subtitle"><a href="#docker" aria-label="docker permalink" class="anchor before"><svg aria-hidden="true" focusable="false" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Docker</h2>
 <p>docker is available and you will see the samba container running for the VM</p>
 <p>Please use install-docker-clients script if you don’t have docker clients installed.</p>
 <p><a href="https://www.vagrantmanager.com/">Vagrant Manager</a> would be nice to have. Try setup.ps1 with <code class="language-text">-withvagrantmanager</code></p>
@@ -89,7 +90,7 @@ You can check that <code class="language-text">df -h</code> has some free space 
 <p>Please backup any required files before running. Docker will be still available by this VM</p>
 </blockquote>
 <p>Right click windows menu and click Windows Powershell (Admin)</p>
-<div class="gatsby-highlight" data-language="powershell"><pre class="language-powershell"><code class="language-powershell"><span class="token function">Set-ExecutionPolicy</span> RemoteSigned</code></pre></div>
+<div class="gatsby-highlight" data-language="powershell"><pre class="language-powershell"><code class="language-powershell"><span class="token function">Set-ExecutionPolicy</span> <span class="token operator">-</span>Scope <span class="token keyword">Process</span> <span class="token operator">-</span>ExecutionPolicy Bypass</code></pre></div>
 <p>Run the setup script in the directory of this repo</p>
 <div class="gatsby-highlight" data-language="powershell"><pre class="language-powershell"><code class="language-powershell">\Users\xxx\linuxdev\setup<span class="token punctuation">.</span>ps1</code></pre></div>
 <p>** Running setup script again will check updates and install if newer version found</p>
