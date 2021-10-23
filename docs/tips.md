@@ -14,6 +14,8 @@ date: 2021-09-26
 
 If you want to repeat from scratch for some reason, you can run `./destroy.sh` and retry `bootstrap.sh`.
 
+## Docker
+
 docker is available and you will see the samba container running for the VM
 
 Please use install-docker-clients script if you don't have docker clients installed.
