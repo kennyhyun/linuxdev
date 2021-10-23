@@ -52,7 +52,7 @@ docker system prune --volumes
 윈도우 메뉴버튼을 오른클릭 하여 윈도우 파워쉘 (관리자)를 클릭합니다.
 
 ```powershell
-Set-ExecutionPolicy RemoteSigned
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```
 
 본 리포지터리의 폴더 (linuxdev)의 셋업 스크립트를 실행합니다.
