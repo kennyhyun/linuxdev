@@ -7,7 +7,13 @@ date: 2021-10-15
 
 You can create .env to customize the VM environment. Bootstrap interactively inputs the required values with some default values.
 
-## Name
+## Interactive Variables
+
+They have default values and are asked during bootstrap.sh and saved so it's not asked again.
+
+### Name
+
+Machine name
 
 ```
 NAME=awesome-name
@@ -15,7 +21,9 @@ NAME=awesome-name
 
 This will rename the machine name in VirtualBox. run `vagrant reload` to apply when updated.
 
-## Cpus and memory
+It will also set the hostname of VM
+
+### Cpus and memory
 
 ```
 CPUS=4
@@ -24,7 +32,29 @@ MEMORY=8192
 
 This will adjust cpus and memory, run `vagrant reload` to apply when updated.
 
-## Expand disk size
+### Vagrant Username
+
+```
+EXPAND_DISK_GB=10
+```
+
+### Dotfiles Repo
+
+```
+DOTFILES_REPO=https://github.com/kennyhyun/dotfiles.git
+```
+
+This will make bootstrap continue to set VM environment using this external script repo
+
+** This has no default variable
+
+
+
+## Optional Variables
+
+it's not saved automatically but you can manually add by editing .env file
+
+### Expand disk size
 
 ```
 EXPAND_DISK_GB=10
@@ -39,7 +69,7 @@ And you will have some slowness on the VM for a while but would not be slow whil
 This should be setup before running bootstrap.
 Or you can retry after removing `/dummy`
 
-## Docker lib disk
+### Docker lib disk
 
 ```
 DOCKER_DISK_SIZE_GB=45
@@ -57,7 +87,7 @@ This has no default value so it uses the dynamic sized system disk image (maximu
 
 If you had some data left in the system disk docker libs, you can see that by 1. stop docker, 2. unmounting /var/lib/docker, 3. start docker again. You can also delete that after unmounting if you don't need that any more. 
 
-## docker-compose version
+### docker-compose version
 
 ```
 COMPOSE_VERSION=1.29.2
@@ -65,7 +95,7 @@ COMPOSE_VERSION=1.29.2
 
 Downloads docker-compose from `https://github.com/docker/compose/releases/download/\${dc_version}/docker-compose-$(uname -s)-$(uname -m)`
 
-## Share host directories
+### Share host directories
 
 You can add shared directory by envionment variables. You will need to `vagrat reload`
 
@@ -78,7 +108,7 @@ If you use **docker** in the host OS and binding volumes, the source volume shou
 If the path does not exist, it creates a blank directory and shares
 
 
-## Setting VM environment variables
+### Setting VM environment variables
 
 If you want to set VM environment variables by the host .env file, use `__VM__` prefix
 
@@ -94,7 +124,12 @@ VERSION=1.2.3
 
 in the VM
 
-## Setting VM hosts entries
+** __VM__ZSH_THEME will set the omz theme in the VM. Please try your favorite one
+
+https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
+
+
+### Setting VM hosts entries
 
 If you want to add some hosts entry from the host `.env` file, use `__VMHOSTS__` prefix
 
@@ -121,3 +156,18 @@ __VMHOSTS__127_0_0_1_t=theotherhost
 ```
 
 Anything after 4th underscore is ignored
+
+### Fonts
+
+```
+FONT_URLS=https://www.fontsquirrel.com/fonts/download/camingocode
+PATCHED_FONT_URLS=https://github.com/tonsky/FiraCode/releases/download/5.2/Fira_Code_v5.2.zip
+```
+
+will download url and install those automatically.
+
+you can use urls for ttfs or zip files separated with comma
+
+It patches font for powerline with [nerd fonts](https://www.nerdfonts.com/).
+
+For already patched fonts, it can be used in `PATCHED_FONT_URLS`

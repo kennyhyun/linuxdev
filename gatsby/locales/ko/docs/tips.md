@@ -12,11 +12,9 @@ date: 2021-09-26
 - `vagrant reload` 로 MEMORY, CPUS와 같은 .env 세팅을 적용하고 **재부팅** 합니다
 - `./destory.sh` 로 VM을 파기하고 생성전의 상태로 돌아갑니다.
 
-### VM파기
-
 여러가지 이유로 처음부터 시작하고 싶다면, `./destroy.sh` 한 후 다시 `bootstrap.sh` 명령을 실행하면 됩니다.
 
-### 도커
+## 도커
 
 VM안에서 도커가 이용가능하고 VM을 위해 작동중인 samba 컨테이너를 확인할 수 있습니다.
 
@@ -25,6 +23,36 @@ VM안에서 도커가 이용가능하고 VM을 위해 작동중인 samba 컨테�
 도커 실행파일이 설치되어있지 않으면 install-docker-clients 스크립트를 이용해 도커 명령어를 설치할 수 있습니다
 
 [Vagrant 매니저](https://www.vagrantmanager.com/) 도 사용하시면 좋습니다.
+
+
+## VM으로부터 네트웍 드라이브 매핑
+
+Virtualbox 머신은 디폴트로 IP어드레스 192.168.99.123 가 설정됩니다.
+그리고 유저 홈의 Projects 디렉토리를 공유하고 있습니다. 호스트 머신은 VM내의 Projects 디렉토리를 매핑할 수 있습니다.
+
+```
+\\192.168.99.123\Projects
+```
+
+** 윈도우쪽에 설치된 git을 사용하는 경우는 global config의 filemode를 off로 설정하여야 합니다.
+
+## Setup 명령 파라메터
+
+```powershell
+.\setup.ps1 -nodevtools
+```
+
+또는
+
+```bash
+./setup.sh --no-devtools
+```
+
+는 git(for Mac), vscode, terminal 등의 설치를 건너뜁니다.
+
+`--no-{vscode,git,vagrant,virtualbox,...}` 옵션도 사용 할 수 있습니다
+
+** 윈도우에서 git은 gitbash 때문에 필수입니다.
 
 ## 도커 저장소
 
@@ -52,7 +80,7 @@ docker system prune --volumes
 윈도우 메뉴버튼을 오른클릭 하여 윈도우 파워쉘 (관리자)를 클릭합니다.
 
 ```powershell
-Set-ExecutionPolicy RemoteSigned
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```
 
 본 리포지터리의 폴더 (linuxdev)의 셋업 스크립트를 실행합니다.
@@ -75,15 +103,3 @@ linuxdev 디렉토리 (본 리포지터리) 에서
 
 위 명령은 virtualbox 머신을 생성하고 부팅시키고 자동 설정을 수행합니다.
 
-### VM으로부터 네트웍 드라이브 매핑
-
-Virtualbox 머신은 디폴트로 IP어드레스 192.168.99.123 가 설정됩니다.
-그리고 유저 홈의 Projects 디렉토리를 공유하고 있습니다. 호스트 머신은 VM내의 Projects 디렉토리를 매핑할 수 있습니다.
-
-```
-\\192.168.99.123\Projects
-```
-
-** 윈도우쪽에 설치된 git을 사용하는 경우는 global config의 filemode를 off로 설정하여야 합니다.
-
-    
