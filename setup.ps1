@@ -36,6 +36,10 @@ If ($args.Contains("-withvagrantmanager")) {
   $withVagrantManager=1
 }
 
+If ($args.Contains("-withosconfig")) {
+  $withOsConfig=1
+}
+
 If ($args.Contains("-nohyperv")) {
   $noHyperv=1
 }
@@ -53,6 +57,10 @@ Note: This will turn off WSL2
 =================================="
 if (-not $noConfirm) {
 Read-Host -Prompt "Press any key to continue or ^C to stop"
+}
+
+if ($withOsConfig) {
+  & "$PSScriptRoot\scripts\basic-config.ps1"
 }
 
 if (-not $noHyperv) {

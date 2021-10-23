@@ -174,7 +174,7 @@ fi
 if [ -z "\$(crontab -l|grep "${machine_name}.startup.sh")" ]; then
   echo "-----
 Adding startup script to crontab"
-  cp /vagrant/vm.docker.disk.sh /root/docker.disk.sh && \
+  cp /vagrant/config/vm.docker.disk.sh /root/docker.disk.sh && \
   chmod +x /root/docker.disk.sh && \
   echo "#!/bin/sh
 /root/docker.disk.sh" > /root/${machine_name}.startup.sh && \
@@ -296,10 +296,10 @@ if [ -d ~/.docker/certs.$machine_name ]; then
 else
   echo "--------
 Creating Docker certs"
-  ssh $machine_name /vagrant/create_docker_certs.sh
+  ssh $machine_name /vagrant/scripts/create_docker_certs.sh
   mkdir -p ~/.docker/certs.$machine_name
   cp $SCRIPT_DIR/certs/*.pem ~/.docker/certs.$machine_name/
-  ssh $machine_name sudo /vagrant/config_docker_certs.sh
+  ssh $machine_name sudo /vagrant/scripts/config_docker_certs.sh
   echo "export DOCKER_CERT_PATH=~/.docker/certs.$machine_name
 export DOCKER_HOST=tcp://$ip_address:$docker_port
 export DOCKER_TLS_VERIFY=1
@@ -314,7 +314,7 @@ fi
 #### install fonts
 mkdir -p $SCRIPT_DIR/data/fonts
 touch $SCRIPT_DIR/data/fonts/.download_start_file
-ssh $machine_name "bash /vagrant/download_fonts.sh $FONT_URLS $PATCHED_FONT_URLS"
+ssh $machine_name "bash /vagrant/scripts/download_fonts.sh $FONT_URLS $PATCHED_FONT_URLS"
 downloaded=$(find $SCRIPT_DIR/data/fonts -maxdepth 1 -newer $SCRIPT_DIR/data/fonts/.download_start_file -type f -name "*.ttf")
 if [ "$downloaded" ]; then
   if [ "$windows"]; then
