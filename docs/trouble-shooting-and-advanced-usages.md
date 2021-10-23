@@ -61,4 +61,57 @@ The issue was fixed I upgrade OSX to 16.
 
 If you have 11.4, please consider upgrade to 11.6 or the latest.
 
+## Use ext4 partition on Windows 10
 
+This would be just an instace how to use ext4 partitions
+
+USB external disks can be mounted directly to the Linux on VM and if you have VirtualBox Extension pack, USB3 is also supported.
+
+The following instruction is mounting external disk to VirtualBox without the extension pack.
+
+### Mount entire system disk to Virutalbox
+
+#### create vmdk file for the physical drive
+
+Windows Disk Management will show the external disks with the number like 0, 1, 2
+
+if you have the only system drive, it will be 0. so the find the number of the disk which you want to mount.
+
+And run following command in Powershell (admin)
+with modifying the number `2` to the number of your disk
+
+``` powershell
+VBoxManage internalcommands createrawvmdk -filename "$env:USERPROFILE\VirtualBox VMs\external-disk-2.vmdk" -rawdisk \\.\PhysicalDrive2
+```
+
+add the vmdk to your virtualbox.
+
+```ruby
+  config.vm.provider "virtualbox" do |vb|
+...
+    disk_filename = (ENV['USERPROFILE'] || "") + "/VirtualBox VMs/ext4t2.vmdk"
+    vb.customize ['storageattach', :id, '--storagectl', 'SATA Controller', '--port', 3, '--type', 'hdd', '--medium', disk_filename]
+  end
+```
+
+You will need Administrator privileges to starth the VM.
+
+Shutdown all the running VirtualBox VM and kill close Virtualbox and kill all running VBox related tasks. and runt `vagrant reload` command as Admnistrator.
+
+
+When the VM is running, you can check the partitions by
+
+``` bash
+ls -la /dev/disk/by-uuid/
+```
+
+or by root (`sudo su -`)
+
+```bash
+fdisk -l
+```
+
+mount the partition by `mount /dev/disk/by-uuid/4fcc4aba-dd74-4212-b6f0-154c49c69242 /mnt/external-disk-2`
+or add that to `/etc/fstab`
+
+And you can use `startup_as_admin.bat` in the scripts directory to start the VM as administrator
