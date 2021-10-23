@@ -1,5 +1,7 @@
 #!/bin/bash
 
+SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
 set +e
 
 sed="sed"
@@ -63,7 +65,7 @@ vagrant plugin install vagrant-env
 vagrant up
 
 # create ssh config file
-SSH_CONFIG="./ssh.config"
+SSH_CONFIG="$SCRIPT_DIR/ssh.config"
 if [ -z "$(grep vagrant $SSH_CONFIG)" ]; then
   vagrant ssh-config >> $SSH_CONFIG
 fi
@@ -296,7 +298,7 @@ else
 Creating Docker certs"
   ssh $machine_name /vagrant/create_docker_certs.sh
   mkdir -p ~/.docker/certs.$machine_name
-  cp ./certs/*.pem ~/.docker/certs.$machine_name/
+  cp $SCRIPT_DIR/certs/*.pem ~/.docker/certs.$machine_name/
   ssh $machine_name sudo /vagrant/config_docker_certs.sh
   echo "export DOCKER_CERT_PATH=~/.docker/certs.$machine_name
 export DOCKER_HOST=tcp://$ip_address:$docker_port
@@ -307,6 +309,19 @@ export COMPOSE_CONVERT_WINDOWS_PATHS=1
   if [ -z "$(grep bashrc ~/.bash_profile)" ]; then
     echo "test -f ~/.bashrc && source ~/.bashrc" >> ~/.bash_profile
   fi
+fi
+
+#### install fonts
+touch $SCRIPT_DIR/data/fonts/.download_start_file
+ssh $machine_name "bash /vagrant/download_fonts.sh $FONT_URLS $PATCHED_FONT_URLS"
+downloaded=$(find $SCRIPT_DIR/data/fonts -maxdepth 1 -newer $SCRIPT_DIR/data/fonts/.download_start_file -type f -name "*.ttf")
+if [ "$downloaded" ]; then
+  while read file; do
+    echo "Installing $file"
+    base=$(basename "$file")
+    font_args="$font_args \"$base\""
+  done <<< "$downloaded"
+  powershell $SCRIPT_DIR/install_fonts.ps1 $font_args
 fi
 
 #### init dotfiles
@@ -337,11 +352,11 @@ EOSSH
 fi
 
 if [ -z "$windows" ]; then
-  ./setup-launchd.sh
+  $SCRIPT_DIR/setup-launchd.sh
 else
   mkdir -p ~/Programs
   # add Windows Terminal Profile
-  powershell ./add-machine-profile.ps1 $machine_name
+  powershell $SCRIPT_DIR/add-machine-profile.ps1 $machine_name
 
   if [ -f ~/Programs/docker_env.bat ]; then
     echo "-----
@@ -349,7 +364,7 @@ The docker environment is already set. delete ~/Programs/docker_env.bat and try 
   else
     echo "-----
 Setting Docker Environment Variables for Windows. Please check DOCKER_HOST and related ones if you want to use other environments"
-    powershell ./add-programs-to-path.ps1
+    powershell $SCRIPT_DIR/add-programs-to-path.ps1
     echo "@echo off
 set DOCKER_CERT_PATH=%userprofile%\.docker\certs.$machine_name
 set DOCKER_HOST=tcp://$ip_address:$docker_port
