@@ -312,12 +312,12 @@ export COMPOSE_CONVERT_WINDOWS_PATHS=1
 fi
 
 #### install fonts
+mkdir -p $SCRIPT_DIR/data/fonts
 touch $SCRIPT_DIR/data/fonts/.download_start_file
 ssh $machine_name "bash /vagrant/download_fonts.sh $FONT_URLS $PATCHED_FONT_URLS"
 downloaded=$(find $SCRIPT_DIR/data/fonts -maxdepth 1 -newer $SCRIPT_DIR/data/fonts/.download_start_file -type f -name "*.ttf")
 if [ "$downloaded" ]; then
   while read file; do
-    echo "Installing $file"
     base=$(basename "$file")
     font_args="$font_args \"$base\""
   done <<< "$downloaded"
