@@ -359,7 +359,7 @@ EOSSH
 fi
 
 if [ -z "$windows" ]; then
-  $SCRIPT_DIR/setup-launchd.sh
+  $SCRIPT_DIR/scripts/setup-launchd.sh
 else
   mkdir -p ~/Programs
   # add Windows Terminal Profile
