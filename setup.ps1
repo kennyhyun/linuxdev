@@ -68,12 +68,13 @@ if (-not $noHyperv) {
 Write-Host ---------------------------------------
 Write-Host " Disabling Hypervisor Platform"
 bcdedit /set hypervisorlaunchtype off
-Try {
+
+$is_hyper_v = Get-WindowsOptionalFeature -FeatureName Microsoft-Hyper-V-All -Online
+if ($is_hyper_v) {
   Disable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-Hypervisor -All -NoRestart
-} Catch {
-  Write-Host hyper-v not found
 }
-  Disable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -NoRestart
+
+Disable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -NoRestart
 Try {
   Disable-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -NoRestart
   Disable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -NoRestart
