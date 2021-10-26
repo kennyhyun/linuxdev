@@ -322,7 +322,7 @@ if [ "$downloaded" ]; then
       base=$(basename "$file")
       font_args="$font_args \"$base\""
     done <<< "$downloaded"
-    powershell $SCRIPT_DIR/install_fonts.ps1 $font_args
+    powershell -executionPolicy ByPass -File $SCRIPT_DIR/install_fonts.ps1 $font_args
   else
     mkdir -p ~/Library/Fonts
     while read file; do
@@ -363,7 +363,7 @@ if [ -z "$windows" ]; then
 else
   mkdir -p ~/Programs
   # add Windows Terminal Profile
-  powershell $SCRIPT_DIR/add-machine-profile.ps1 $machine_name
+  powershell -executionPolicy ByPass -File $SCRIPT_DIR/add-machine-profile.ps1 $machine_name
 
   if [ -f ~/Programs/docker_env.bat ]; then
     echo "-----
@@ -371,7 +371,7 @@ The docker environment is already set. delete ~/Programs/docker_env.bat and try 
   else
     echo "-----
 Setting Docker Environment Variables for Windows. Please check DOCKER_HOST and related ones if you want to use other environments"
-    powershell $SCRIPT_DIR/add-programs-to-path.ps1
+    powershell -executionPolicy ByPass -File $SCRIPT_DIR/add-programs-to-path.ps1
     echo "@echo off
 set DOCKER_CERT_PATH=%userprofile%\.docker\certs.$machine_name
 set DOCKER_HOST=tcp://$ip_address:$docker_port
