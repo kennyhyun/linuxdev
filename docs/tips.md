@@ -52,6 +52,16 @@ will skip installing git(for Mac), vscode, and terminal.
 
 ** git should be required for Windows to run git-bash
 
+### basic os setting
+
+`-withosconfig` will update registry for
+
+- Disable Secure Desktop (UAC Dimming)
+- Set active hour (8am to 2am)
+- Show hidden files and extensions
+- Disable Windows Update
+
+You can also run separately by `scripts/basic-config.ps1`
 
 ## Docker Storage
 
