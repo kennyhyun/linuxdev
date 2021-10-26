@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ -z "$1" ]; then
+if [ -z "$1" ] && [ -z "$2" ]; then
   echo "Please provide font_urls separated with comma"
   exit -1
 fi
