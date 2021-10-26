@@ -54,6 +54,17 @@ Virtualbox 머신은 디폴트로 IP어드레스 192.168.99.123 가 설정됩니
 
 ** 윈도우에서 git은 gitbash 때문에 필수입니다.
 
+### basic os setting
+
+`-withosconfig` 로 다음과 같이 필수 레지스트리를 수정 합니다
+
+- Secure Desktop (UAC Dimming) 비활성
+- active hour 설정 (오전 8시 부터 오전 2시)
+- 숨김파일 및 확장자 표시
+- Windows Update 비활성
+
+You can also run separately by `scripts/basic-config.ps1`
+
 ## 도커 저장소
 
 도커는 특히 node.js 프로젝트를 사용하는 경우 많은 작은 파일을 사용하게 됩니다.
