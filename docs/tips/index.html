@@ -76,6 +76,15 @@ and it shares Projects directory so Host machine can see the files in it.</p>
 <p>will skip installing git(for Mac), vscode, and terminal.</p>
 <p><code class="language-text">--no-{vscode,git,vagrant,virtualbox,...}</code> is also available</p>
 <p>** git should be required for Windows to run git-bash</p>
+<h3 id="basic-os-setting" style="position:relative;"><a href="#basic-os-setting" aria-label="basic os setting permalink" class="anchor before"><svg aria-hidden="true" focusable="false" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>basic os setting</h3>
+<p><code class="language-text">-withosconfig</code> will update registry for</p>
+<ul>
+<li>Disable Secure Desktop (UAC Dimming)</li>
+<li>Set active hour (8am to 2am)</li>
+<li>Show hidden files and extensions</li>
+<li>Disable Windows Update</li>
+</ul>
+<p>You can also run separately by <code class="language-text">scripts/basic-config.ps1</code></p>
 <h2 id="docker-storage" style="position:relative;" class="subtitle"><a href="#docker-storage" aria-label="docker storage permalink" class="anchor before"><svg aria-hidden="true" focusable="false" height="16" version="1.1" viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Docker Storage</h2>
 <p>Docker tend to use many small files especially for node.js projects</p>
 <p>If the main storage has not enough inodes, docker can fail because of the disk space.
