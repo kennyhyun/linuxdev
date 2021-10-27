@@ -246,6 +246,18 @@ $vbox_installer_version = echo $vbox_installer_filename | %{$_.SubString($_.Inde
 $vbox_installer = "$env:temp\$($vbox_installer_filename)"
 #Write-Host $vbox_installer_version, $installed_vbox_version
 Write-Host "VirtualBox $vbox_installer_version (installed: $installed_vbox_version)"
+
+function save-vm-states {
+  # list running vms and savestate
+  & $vbox_manage list runningvms|foreach-object -Process {
+    if ($_ -match '"(.+?)"') {
+      $vm_name = $matches[1]
+      write-host Saving state $vm_name
+      & $vbox_manage controlvm "$vm_name" savestate
+    }
+  }
+}
+
 if ($installed_vbox_version -And $installed_vbox_version -match $vbox_installer_version.split('-')[1] ) {
   Write-Host already installed
 } else {
@@ -258,6 +270,9 @@ if ($installed_vbox_version -And $installed_vbox_version -match $vbox_installer_
   }
   # Install vbox
   Write-Host Installing $vbox_installer_filename
+  if ($installed_vbox_version) {
+    save-vm-states
+  }
   Try {
     Start-Process -Wait -FilePath $vbox_installer -Argument "--silent --ignore-reboot" -PassThru
   } catch {
