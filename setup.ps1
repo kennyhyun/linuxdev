@@ -110,7 +110,7 @@ function download_from_installer_url {
   }
   #write-host "Download-from-installer-url: $url, $filename"
   $temp_file = "$env:temp\$filename"
-  if (-not $filename -and $temp_file -notmatch ".exe") {
+  if ($temp_file -notmatch ".exe" -and $temp_file -notmatch ".msi") {
     $temp_file = "$temp_file.exe"
   }
   if (Test-Path($temp_file)) {
