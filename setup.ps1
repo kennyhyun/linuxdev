@@ -71,19 +71,28 @@ if (-not $noHyperv) {
 # Disable hyper-v
 Write-Host ---------------------------------------
 Write-Host " Disabling Hypervisor Platform"
-$is_hyper_v = Get-WindowsOptionalFeature -FeatureName Microsoft-Hyper-V-All -Online
-if ($is_hyper_v) {
-  Disable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-Hypervisor -NoRestart
+
+function disable-optional-feature {
+  param ($featureName)
+  $feature = Get-WindowsOptionalFeature -online -FeatureName $featureName
+  if ($feature) {
+    if ($feature.State -eq "Disabled") {
+      write-host $featureName is already disabled
+    } else {
+      Disable-WindowsOptionalFeature -Online -FeatureName $featureName -NoRestart
+    }
+  } else {
+    write-host $featureName was not found
+  }
 }
 
-Try {
-  Disable-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -NoRestart
-  Disable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -NoRestart
-} Catch {
-  Write-Host hypervisor platform not found
-}
+disable-optional-feature -featureName Microsoft-Hyper-V-Hypervisor
+disable-optional-feature -featureName VirtualMachinePlatform
+disable-optional-feature -featureName HypervisorPlatform
+
 bcdedit /set hypervisorlaunchtype off
 }
+
 $virtualization_enabled = systeminfo |select-string "Virtualization Enabled"|out-string|%{$_.SubString($_.IndexOf(': ')+1).trim()}
 
 Write-Host Virtualization support: $virtualization_enabled
@@ -101,7 +110,7 @@ function download_from_installer_url {
   }
   #write-host "Download-from-installer-url: $url, $filename"
   $temp_file = "$env:temp\$filename"
-  if (-not $filename -and $temp_file -notmatch ".exe") {
+  if ($temp_file -notmatch ".exe" -and $temp_file -notmatch ".msi") {
     $temp_file = "$temp_file.exe"
   }
   if (Test-Path($temp_file)) {
@@ -236,7 +245,19 @@ $vbox_installer_filename = $vbox_installer_url.Segments[-1]
 $vbox_installer_version = echo $vbox_installer_filename | %{$_.SubString($_.IndexOf('-')+1)} | %{$_.SubString(0, $_.IndexOf('-Win'))}
 $vbox_installer = "$env:temp\$($vbox_installer_filename)"
 #Write-Host $vbox_installer_version, $installed_vbox_version
-Write-Host VirtualBox $vbox_installer_version
+Write-Host "VirtualBox $vbox_installer_version (installed: $installed_vbox_version)"
+
+function save-vm-states {
+  # list running vms and savestate
+  & $vbox_manage list runningvms|foreach-object -Process {
+    if ($_ -match '"(.+?)"') {
+      $vm_name = $matches[1]
+      write-host Saving state $vm_name
+      & $vbox_manage controlvm "$vm_name" savestate
+    }
+  }
+}
+
 if ($installed_vbox_version -And $installed_vbox_version -match $vbox_installer_version.split('-')[1] ) {
   Write-Host already installed
 } else {
@@ -249,6 +270,9 @@ if ($installed_vbox_version -And $installed_vbox_version -match $vbox_installer_
   }
   # Install vbox
   Write-Host Installing $vbox_installer_filename
+  if ($installed_vbox_version) {
+    save-vm-states
+  }
   Try {
     Start-Process -Wait -FilePath $vbox_installer -Argument "--silent --ignore-reboot" -PassThru
   } catch {
