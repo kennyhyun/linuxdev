@@ -59,6 +59,10 @@ if (-not $noConfirm) {
 Read-Host -Prompt "Press any key to continue or ^C to stop"
 }
 
+$machine_path = [Environment]::GetEnvironmentVariables("Machine")['Path']
+$user_path = [Environment]::GetEnvironmentVariables("User")['Path']
+$env:Path = "$machine_path;$user_path"
+
 if ($withOsConfig) {
   & "$PSScriptRoot\scripts\basic-config.ps1"
 }
@@ -67,14 +71,11 @@ if (-not $noHyperv) {
 # Disable hyper-v
 Write-Host ---------------------------------------
 Write-Host " Disabling Hypervisor Platform"
-bcdedit /set hypervisorlaunchtype off
-
 $is_hyper_v = Get-WindowsOptionalFeature -FeatureName Microsoft-Hyper-V-All -Online
 if ($is_hyper_v) {
-  Disable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-Hypervisor -All -NoRestart
+  Disable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-Hypervisor -NoRestart
 }
 
-Disable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -NoRestart
 Try {
   Disable-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -NoRestart
   Disable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -NoRestart
@@ -127,7 +128,7 @@ Write-Host $terminal_asset.name
 if ($installed_terminal_version -And $terminal_asset.name -match $installed_terminal_version) {
   Write-Host already installed
 } else {
-  Write-Host "Installing $terminal_asset.name (installed: $installed_terminal_version)"
+  Write-Host Installing $terminal_asset.name "(installed: $installed_terminal_version)"
   $terminal_installer = download_from_installer_url -url $terminal_asset.url -filename $terminal_asset.name
   Try {
     Add-AppPackage -path $terminal_installer
@@ -173,7 +174,7 @@ $vscode_installer_version = echo $vscode_installer_filename| %{$_.split('-')[-1]
 #Write-Host $vscode_installer_filename, $vscode_installer_version
 
 $vscode_installer = "$env:temp\$($vscode_installer_filename)"
-Write-Host VS Code $vscode_installer_version
+Write-Host VS Code $vscode_installer_version "(installed: $installed_vscode_version)"
 if ($installed_vscode_version -And $vscode_installer_version -match $installed_vscode_version) {
   Write-Host already installed
 } else {
@@ -203,7 +204,7 @@ Try {
   $installed_git_version = git --version | %{$_.split(' ')[-1]} | %{$_.SubString(0, $_.IndexOf('.windows'))}
 } catch {}
 $git_asset = get_github_release_url -url "https://api.github.com/repos/git-for-windows/git/releases/latest" -pattern "*64-bit.exe"
-Write-Host "$git_asset.name (installed: $installed_git_version)"
+Write-Host $git_asset.name "(installed: $installed_git_version)"
 if ($installed_git_version -And $git_asset.name -match $installed_git_version) {
   Write-Host already installed
 } Else {

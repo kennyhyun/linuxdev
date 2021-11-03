@@ -37,14 +37,14 @@ if [ -z "$NAME" ]; then
   echo "NAME=${machine_name}">> .env
 fi
 
-if [ -z "$CPU" ]; then
+if [ -z "$CPUS" ]; then
   echo -n "> Please enter the number of cpus to assign to the VM [2]:"
   read input
-  echo "CPU=${input:-2}">> .env
+  echo "CPUS=${input:-2}">> .env
 fi
 
 if [ -z "$MEMORY" ]; then
-  echo -n "> Please enter the kilobytes of memory [1024]:"
+  echo -n "> Please enter the megabytes of memory [1024]:"
   read input
   echo "MEMORY=${input:-1024}">> .env
 fi
@@ -315,15 +315,15 @@ fi
 mkdir -p $SCRIPT_DIR/data/fonts
 touch $SCRIPT_DIR/data/fonts/.download_start_file
 if [ "$FONT_URLS" ] || [ "$PATCHED_FONT_URLS" ]; then
-ssh $machine_name "bash /vagrant/scripts/download_fonts.sh \"$FONT_URLS\" \"$PATCHED_FONT_URLS\""
+ssh $machine_name "bash /vagrant/scripts/download-fonts.sh \"$FONT_URLS\" \"$PATCHED_FONT_URLS\""
 downloaded=$(find $SCRIPT_DIR/data/fonts -maxdepth 1 -newer $SCRIPT_DIR/data/fonts/.download_start_file -type f -name "*.ttf")
 if [ "$downloaded" ]; then
-  if [ "$windows"]; then
+  if [ "$windows" ]; then
     while read file; do
       base=$(basename "$file")
       font_args="$font_args \"$base\""
     done <<< "$downloaded"
-    powershell -executionPolicy ByPass -File $SCRIPT_DIR/install_fonts.ps1 $font_args
+    powershell -executionPolicy ByPass -Command "& $(realpath --relative-to=. $SCRIPT_DIR)/scripts/install-fonts.ps1 $font_args"
   else
     mkdir -p ~/Library/Fonts
     while read file; do
