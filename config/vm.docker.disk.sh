@@ -11,13 +11,15 @@ add_docker_disk_to_fstab () {
 		echo "$partition /mnt/$partition_name ext4 defaults,nofail 0 2 # by linuxdev startup script" >> /etc/fstab
 		echo Added $partition to /etc/fstab
 		mount -a
-		mkdir -p /mnt/$partition_name/var/lib/docker
-		echo "/mnt/$partition_name/var/lib/docker /var/lib/docker ext4 bind,defaults,nofail 0 0 # by linuxdev startup script" >> /etc/fstab
-		echo Added docker lib directory to /etc/fstab
-		service docker stop
-		mount -a
-		service docker start
-		echo Restarted docker daemon
+		if [ -z "$(grep /var/lib/docker /etc/fstab)"]; then
+			mkdir -p /mnt/$partition_name/var/lib/docker
+			echo "/mnt/$partition_name/var/lib/docker /var/lib/docker ext4 bind,defaults,nofail 0 0 # by linuxdev startup script" >> /etc/fstab
+			echo Added docker lib directory to /etc/fstab
+			service docker stop
+			mount -a
+			service docker start
+			echo Restarted docker daemon
+		fi
 	else
 		echo $partition found on /etc/fstab. skipping to add
 	fi
