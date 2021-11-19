@@ -94,6 +94,13 @@ Vagrant.configure("2") do |config|
       vb.customize ['createhd', '--filename', disk_filename, '--variant', 'Fixed', '--size', docker_disk_size.to_i * 1024]
       vb.customize ['storageattach', :id,  '--storagectl', 'SATA Controller', '--port', 1, '--type', 'hdd', '--medium', disk_filename]
     end
+    project_disk_size = ENV['PROJECT_DISK_SIZE_GB']
+    disk_filename = (ENV['VMDISK_LOCATION'] || "") + "#{machine_name}.projects.#{project_disk_size}.vdi"
+    if project_disk_size && !File.exist?(disk_filename)
+      vb.customize ['createhd', '--filename', disk_filename, '--variant', 'Fixed', '--size', project_disk_size.to_i * 1024]
+      vb.customize ['storageattach', :id,  '--storagectl', 'SATA Controller', '--port', 2, '--type', 'hdd', '--medium', disk_filename]
+    end
+
   end
 
   # Enable provisioning with a shell script. Additional provisioners such as
