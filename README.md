@@ -19,6 +19,22 @@ Boot up Linux development env using Vagrant
 |Limiting memory usuage	|<sub>.wslconfig file for WSL2/GUI for VM</sub>|<sub>.env file/VirtualBox GUI</sub>|
 
 
+## ⚠ Note for Windows VBS (Virtualization-based security or Device Guard)
+
+**Some** recent windows update enables VBS and it will turn on hyper-v
+and that would make Vrtualbox slow and unstable.
+
+If `systeminfo` command shows following at the bottom, it's good to use Virtualbox.
+
+```
+Hyper-V Requirements:      VM Monitor Mode Extensions: Yes
+                           Virtualization Enabled In Firmware: Yes
+                           Second Level Address Translation: Yes
+                           Data Execution Prevention Available: Yes
+```                        
+
+Pease follow [he issue](https://github.com/kennyhyun/linuxdev/issues/71) for further guidance.
+
 ## Why?
 
 Docker is necessary for developing nowadays. But if you are not using Linux as the OS, it requires VM for Docker engine.
