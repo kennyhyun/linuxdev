@@ -79,7 +79,7 @@ vagrant_uid=$($ssh id -u vagrant 2>/dev/null)
 
 set -e
 
-if [ "$vagrant_uid" == "1000" ] || ([ "$exists" != "" ] && [ "$exists" != "1000" ]); then
+if [ "$vagrant_uid" == "1000" ] && ([ "$exists" != "" ] && [ "$exists" != "1000" ]); then
   echo switching is required, remove $username and try again
 fi
 if [ -z "$vagrant_uid" ]; then
