@@ -6,6 +6,8 @@
 # backwards compatibility). Please don't change it unless you know what
 # you're doing.
 Vagrant.configure("2") do |config|
+  config.env.enable # plugin vagrant-env
+  
   # The most common configuration options are documented and commented below.
   # For a complete reference, please see the online documentation at
   # https://docs.vagrantup.com.
@@ -14,8 +16,6 @@ Vagrant.configure("2") do |config|
   # boxes at https://vagrantcloud.com/search.
   config.vm.box = ENV['VM_BOX'] || "bento/debian-12"
   config.vm.box_version = ENV['_VER_VM_BOX'] || "202401.31.0"
-
-  config.env.enable # plugin vagrant-env
 
   # Disable automatic box update checking. If you disable this, then
   # boxes will only be checked for updates when the user runs
