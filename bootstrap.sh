@@ -128,6 +128,8 @@ fi
 
 vm_hosts_vars=$(set | grep "__VMHOSTS__[^=]\+=" | cut -c 12-)
 $ssh << EOSSH
+echo --------------------- Removing vagrant password
+passwd vagrant --delete > /dev/null
 echo ---------------------
 echo Adding $username to Sudoer 
 usermod -aG sudo $username
