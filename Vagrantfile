@@ -13,7 +13,7 @@ Vagrant.configure("2") do |config|
   # Every Vagrant development environment requires a box. You can search for
   # boxes at https://vagrantcloud.com/search.
   config.vm.box = ENV['VM_BOX'] || "bento/debian-10.10"
-  config.vm.box_version = "202107.08.0"
+  config.vm.box_version = ENV['BOX_VERSION'] || "202107.08.0"
 
   config.env.enable # plugin vagrant-env
 
