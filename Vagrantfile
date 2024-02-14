@@ -15,7 +15,7 @@ Vagrant.configure("2") do |config|
   # Every Vagrant development environment requires a box. You can search for
   # boxes at https://vagrantcloud.com/search.
   config.vm.box = ENV['VM_BOX'] || "bento/debian-12"
-  config.vm.box_version = ENV['_VER_VM_BOX'] || "202401.31.0"
+  config.vm.box_version = ENV['_VER_VM_BOX'] || "202309.08.0"
 
   # Disable automatic box update checking. If you disable this, then
   # boxes will only be checked for updates when the user runs
