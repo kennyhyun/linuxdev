@@ -227,32 +227,40 @@ ssh $machine_name "touch ~/.hushlogin"
 #### user $username
 ssh $machine_name << EOSSH
 
-echo "==============================\nHello from $machine_name, \$(whoami)"
+echo "==============================
+Hello from $machine_name, \$(whoami)"
 sudo apt remove vim -y
 sudo apt update && sudo apt install \
 git \
 zsh \
-vim-gtk \
+vim \
 python3-pip \
 dnsutils \
 pass gnupg2 \
 -y
 
+if [ "\$?" -eq 0 ]; then
 if [ -f ~/.oh-my-zsh/oh-my-zsh.sh ]; then
-  echo "-----\noh my zsh is aleady installed"
+  echo "-----
+oh my zsh is aleady installed"
 else
-  echo "-----\nInstalling oh my zsh...."
+  echo "-----
+Installing oh my zsh...."
   wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
-  sh install.sh --unattended
-  rm -f install.sh*
+  sh install.sh --unattended && \
+  rm -f install.sh* && \
   sudo chsh -s /bin/zsh $username
 fi
+fi
 
+if [ "\$?" -eq 0 ]; then
 if [ -f "/usr/local/bin/docker-compose" ]; then
-  echo "-----\ndocker-compose aleady exists"
+  echo "-----
+docker-compose aleady exists"
   docker-compose --version
 else
-  echo "-----\nInstalling docker-compose...."
+  echo "-----
+Installing docker-compose...."
   sudo pip3 install requests --upgrade
   dc_version=\${COMPOSE_VERSION:-1.29.2}
   dc_version_url=/docker/compose/releases/download/\${dc_version}/docker-compose-\$(uname -s)-\$(uname -m)
@@ -266,12 +274,16 @@ else
     docker-compose --version
   fi
 fi
+fi
 
+if [ "\$?" -eq 0 ]; then
 mkdir -p ~/Projects
 if [ -d ~/samba ]; then
-  echo "-----\nSamba config is found. skipping to create"
+  echo "-----
+Samba config is found. skipping to create"
 else
-  echo "-----\nConfiguring samba"
+  echo "-----
+Configuring samba"
   mkdir -p samba
   cp /vagrant/config/samba/* samba/
   cd samba
@@ -280,6 +292,7 @@ else
   docker cp /etc/passwd samba:/etc/passwd
   chmod +x adduser
   ./adduser \$USER
+fi
 fi
 
 if [ -f "/dummy" ]; then
