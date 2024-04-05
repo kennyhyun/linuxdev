@@ -6,16 +6,16 @@
 # backwards compatibility). Please don't change it unless you know what
 # you're doing.
 Vagrant.configure("2") do |config|
+  config.env.enable # plugin vagrant-env
+  
   # The most common configuration options are documented and commented below.
   # For a complete reference, please see the online documentation at
   # https://docs.vagrantup.com.
 
   # Every Vagrant development environment requires a box. You can search for
   # boxes at https://vagrantcloud.com/search.
-  config.vm.box = ENV['VM_BOX'] || "bento/debian-10.10"
-  config.vm.box_version = "202107.08.0"
-
-  config.env.enable # plugin vagrant-env
+  config.vm.box = ENV['VM_BOX'] || "bento/debian-12"
+  config.vm.box_version = ENV['_VER_VM_BOX'] || "202309.08.0"
 
   # Disable automatic box update checking. If you disable this, then
   # boxes will only be checked for updates when the user runs
@@ -32,6 +32,8 @@ Vagrant.configure("2") do |config|
   # within the machine from a port on the host machine and only allow access
   # via 127.0.0.1 to disable public access
   # config.vm.network "forwarded_port", guest: 80, host: 8080, host_ip: "127.0.0.1"
+  ssh_port = ENV['SSH_PORT'] || "3222"
+  config.vm.network "forwarded_port", guest: 22, host: ssh_port, host_ip: "0.0.0.0", id: 'ssh'
   forwarded_ports = (ENV['FORWARDED_PORTS'] || "443").split(',')
   forwarded_ports.each { |forwarded_port|
     port = forwarded_port.to_i
@@ -94,6 +96,13 @@ Vagrant.configure("2") do |config|
       vb.customize ['createhd', '--filename', disk_filename, '--variant', 'Fixed', '--size', docker_disk_size.to_i * 1024]
       vb.customize ['storageattach', :id,  '--storagectl', 'SATA Controller', '--port', 1, '--type', 'hdd', '--medium', disk_filename]
     end
+    project_disk_size = ENV['PROJECT_DISK_SIZE_GB']
+    disk_filename = (ENV['VMDISK_LOCATION'] || "") + "#{machine_name}.projects.#{project_disk_size}.vdi"
+    if project_disk_size && !File.exist?(disk_filename)
+      vb.customize ['createhd', '--filename', disk_filename, '--variant', 'Fixed', '--size', project_disk_size.to_i * 1024]
+      vb.customize ['storageattach', :id,  '--storagectl', 'SATA Controller', '--port', 2, '--type', 'hdd', '--medium', disk_filename]
+    end
+
   end
 
   # Enable provisioning with a shell script. Additional provisioners such as
