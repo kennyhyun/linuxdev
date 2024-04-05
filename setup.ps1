@@ -148,23 +148,6 @@ if ($installed_terminal_version -And $terminal_asset.name -match $installed_term
 }
 }
 
-# Install vagrant manager
-If ($withVagrantManager) {
-  Write-Host ---------------------------------------
-  $vmanager_location1="$env:ProgramFiles (x86)\Vagrant Manager\VagrantManager.exe"
-  $vmanager_location2="$env:LOCALAPPDATA\Programs\Vagrant Manager\VagrantManager.exe"
-  If ((Test-Path $vmanager_location1) -or (Test-Path $vmanager_location2)) {
-    Write-Host Vagrant Manager is already installed
-  } else {
-    Write-Host Installing Vagrant Manager
-    $vmanager_installer = download_github_release_installer -url "https://api.github.com/repos/lanayotech/vagrant-manager-windows/releases/latest" -pattern "*.exe"
-    $install_args = "/SP- /SILENT /NOCANCEL /NORESTART /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS"
-    Write-Host Installing $vmanager_installer, $install_args
-    Start-Process -FilePath $vmanager_installer -ArgumentList $install_args
-    Write-Host Installed Vagrant Manager.
-  }
-}
-
 ######################
 # Install vscode
 If (-Not $noVsCode) {
@@ -282,6 +265,23 @@ if ($installed_vbox_version -And $installed_vbox_version -match $vbox_installer_
 }
 }
 
+# Install vagrant manager
+If ($withVagrantManager) {
+  Write-Host ---------------------------------------
+  $vmanager_location1="$env:ProgramFiles (x86)\Vagrant Manager\VagrantManager.exe"
+  $vmanager_location2="$env:LOCALAPPDATA\Programs\Vagrant Manager\VagrantManager.exe"
+  If ((Test-Path $vmanager_location1) -or (Test-Path $vmanager_location2)) {
+    Write-Host Vagrant Manager is already installed
+  } else {
+    Write-Host Installing Vagrant Manager
+    $vmanager_installer = download_github_release_installer -url "https://api.github.com/repos/lanayotech/vagrant-manager-windows/releases/latest" -pattern "*.exe"
+    $install_args = "/SP- /SILENT /NOCANCEL /NORESTART /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS"
+    Write-Host Installing $vmanager_installer, $install_args
+    Start-Process -FilePath $vmanager_installer -ArgumentList $install_args
+    Write-Host Installed Vagrant Manager.
+  }
+}
+
 ######################
 # Install vagrant
 If (-Not $noVagrant) {
@@ -290,7 +290,7 @@ Try {
   $installed_vagrant_version = vagrant --version | %{$_.split(' ')[1]}
 } catch {}
 #Write-Host Vagrant version: $installed_vagrant_version
-$vagrant_url = "https://www.vagrantup.com/downloads"
+$vagrant_url = "https://developer.hashicorp.com/vagrant/install"
 $vagrant_link = (Invoke-WebRequest -UseBasicParsing -Uri $vagrant_url).Links | Where-Object {$_.href -like "*64.msi"}
 $vagrant_installer_url = [System.Uri]$vagrant_link.href
 $vagrant_installer_filename = $vagrant_installer_url.Segments[-1]
@@ -319,9 +319,11 @@ if ($installed_vagrant_version -And $installed_vagrant_version -match $vagrant_i
 }
 
 Write-Host ==================================
-Write-Host Done. Please continue to bootstrap
 
 if ($virtualization_enabled -ne "Yes") {
-  Write-Host Virtualization is not enabled, please follow this link and try to enable
-  Write-Host https://www.smarthomebeginner.com/enable-hardware-virtualization-vt-x-amd-v/
+  Write-Host Virtualization is not enabled, please use follow this link and try to disable Device Guard
+  Write-Host "https://github.com/kennyhyun/linuxdev/issues/71#issuecomment-2040021521"
+  exit -2
 }
+
+Write-Host Done. Please continue to bootstrap
