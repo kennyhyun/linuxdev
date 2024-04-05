@@ -319,9 +319,13 @@ if ($installed_vagrant_version -And $installed_vagrant_version -match $vagrant_i
 }
 
 Write-Host ==================================
-Write-Host Done. Please continue to bootstrap
 
 if ($virtualization_enabled -ne "Yes") {
-  Write-Host Virtualization is not enabled, please follow this link and try to enable
-  Write-Host https://www.smarthomebeginner.com/enable-hardware-virtualization-vt-x-amd-v/
+  Write-Host Virtualization is not enabled, please use follow this link and try to disable Device Guard
+  Write-Host https://www.microsoft.com/en-my/download/details.aspx?id=53337
+  Write-Host and run following
+  Write-Host ./DG_Readiness_Tool_v3.6.ps1 -Disable -AutoReboot
+  exit -2
 }
+
+Write-Host Done. Please continue to bootstrap
