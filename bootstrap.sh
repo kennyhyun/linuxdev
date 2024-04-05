@@ -235,6 +235,7 @@ git \
 zsh \
 vim \
 python3-pip \
+tmux \
 dnsutils \
 pass gnupg2 \
 -y

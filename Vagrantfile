@@ -32,6 +32,8 @@ Vagrant.configure("2") do |config|
   # within the machine from a port on the host machine and only allow access
   # via 127.0.0.1 to disable public access
   # config.vm.network "forwarded_port", guest: 80, host: 8080, host_ip: "127.0.0.1"
+  ssh_port = ENV['SSH_PORT'] || "3222"
+  config.vm.network "forwarded_port", guest: 22, host: ssh_port, host_ip: "0.0.0.0", id: 'ssh'
   forwarded_ports = (ENV['FORWARDED_PORTS'] || "443").split(',')
   forwarded_ports.each { |forwarded_port|
     port = forwarded_port.to_i
