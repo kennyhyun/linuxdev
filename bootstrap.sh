@@ -210,6 +210,8 @@ EOSSH
 $ssh "rm ~/.hushlogin"
 
 echo ---------------------
+mkdir -p ~/.ssh
+touch ~/.ssh/config
 if [ -z "$(grep -w "Host $machine_name" ~/.ssh/config)" ]; then
   echo Adding ssh config for $machine_name
   cat $SSH_CONFIG.user >> ~/.ssh/config
