@@ -290,7 +290,7 @@ Try {
   $installed_vagrant_version = vagrant --version | %{$_.split(' ')[1]}
 } catch {}
 #Write-Host Vagrant version: $installed_vagrant_version
-$vagrant_url = "https://www.vagrantup.com/downloads"
+$vagrant_url = "https://developer.hashicorp.com/vagrant/install"
 $vagrant_link = (Invoke-WebRequest -UseBasicParsing -Uri $vagrant_url).Links | Where-Object {$_.href -like "*64.msi"}
 $vagrant_installer_url = [System.Uri]$vagrant_link.href
 $vagrant_installer_filename = $vagrant_installer_url.Segments[-1]
