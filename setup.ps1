@@ -322,9 +322,7 @@ Write-Host ==================================
 
 if ($virtualization_enabled -ne "Yes") {
   Write-Host Virtualization is not enabled, please use follow this link and try to disable Device Guard
-  Write-Host https://www.microsoft.com/en-my/download/details.aspx?id=53337
-  Write-Host and run following
-  Write-Host ./DG_Readiness_Tool_v3.6.ps1 -Disable -AutoReboot
+  Write-Host "https://github.com/kennyhyun/linuxdev/issues/71#issuecomment-2040021521"
   exit -2
 }
 
