@@ -8,7 +8,7 @@ fi
 
 # https://docs.docker.com/engine/security/protect-access/
 
-local_ip_addr=192.168.99.123
+local_ip_addr=${IP_ADDRESS:-192.168.99.123}
 common_name=$local_ip_addr
 
 passphrase=pass:passwd

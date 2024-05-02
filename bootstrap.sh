@@ -101,7 +101,7 @@ fi
 ssh="ssh -F $SSH_CONFIG.root root"
 
 docker_port=${DOCKER_PORT:-2376}
-ip_address=${IP_ADDRESS:-192.168.99.123}
+ip_address=${__VM__IP_ADDRESS:-192.168.99.123}
 $ssh "touch ~/.hushlogin"
 
 if [ -z "$exists" ]; then
