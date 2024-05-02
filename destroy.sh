@@ -13,14 +13,13 @@ vagrant destroy
 
 machine_name=${NAME:-linuxdev}
 
-vagrant status
+not_created=$(vagrant status | grep 'not created')
 
-exitCode=$?
 
-if [[ $exitCode != 0 ]];then
+if [ -n "$not_created" ];then
   echo the VM is not exists any more, removing configs
+  rm -f status
   mkdir -p backup
-  mv ssh.config* backup/
+  mv ssh.config* backup/ 2> /dev/null
   rm -rf ~/.docker/certs.$machine_name
-  exit $exitCode
 fi
