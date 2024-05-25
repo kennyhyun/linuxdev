@@ -63,6 +63,7 @@ if ($wslList -match "$DistroName" -or $wslList -match "DistroName") {
 # Set PASSWD, sshd
 #
 $USER = if ($envVariables['USER']) { $envVariables['USER'] } else { "admin" }
+$SSH_PORT = if ($envVariables['SSH_PORT']) { $envVariables['SSH_PORT'] } else { "3022" }
 $DOTFILES_REPO = $envVariables['DOTFILES_REPO']
 
 write-host "Setting WSL 1 $DistroName"
@@ -71,14 +72,15 @@ wsl -d $DistroName -- bash -c "if [ -z `"`$(ls -d /home/$USER 2> /dev/null)`" ];
 if [ -z `"`$(grep '^default=$USER' /etc/wsl.conf 2> /dev/null)`" ];then echo Makeing $USER default && echo '[user]' >> /etc/wsl.conf && echo `"default=$USER`" >> /etc/wsl.conf ; fi
 apt update &&
 apt install -y git openssh-server &&
-sed -i -E 's,^#?Port.*$,Port 3022,' /etc/ssh/sshd_config &&
+sed -i -E 's,^#?Port.*$,Port $SSH_PORT,' /etc/ssh/sshd_config &&
 echo All done
 "
 if (-not $LASTEXITCODE) {
   # restart to use default user
   wsl --terminate $DistroName
   # as ruser
-  wsl -d $DistroName -- bash -c "ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -q -N '' &&
+  wsl -d $DistroName -- bash -c "sudo service ssh start &&
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -q -N '' &&
 echo Created ssh key &&
 cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys &&
 echo ---------------- &&
@@ -96,50 +98,78 @@ if (-not $existingScheduler) {
 }
 
 
+## ----------
+# set ssh config
+#
+mkdir $env:USERPROFILE\.ssh -Force | out-null
+if ((Test-Path $env:USERPROFILE\.ssh\config -PathType Leaf) -and (Select-String -Path $env:USERPROFILE\.ssh\config -Pattern "\b$DistroName\b" -CaseSensitive)) {
+  echo "$DistroName config found"
+} else {
+  echo "$DistroName config not found, creating one"
+  Write-Output -n @"
+
+Host $DistroName
+  HostName 127.0.0.1
+  Port $SSH_PORT
+  User $USER
+
+
+"@ | out-file -encoding ascii -append -filepath $env:USERPROFILE\.ssh\config
+}
+
+
+## -----------
+# set Defender exclusion
+#
+
+
+$wslpath = get-ChildItem $env:LOCALAPPDATA\Packages -directory | Where-Object {$_.Name -cmatch "$DistroName"} | % {$_.fullname}
+#$excluded = Run-Elevated {
+#	$(Get-MpPreference).ExclusionPath
+#}
+#$exclusionsToAdd = ((Compare-Object $wslPaths $currentExclusions) | Where-Object SideIndicator -eq "<=").InputObject
+$dirs = @"
+\bin
+\sbin
+\usr\bin
+\usr\sbin
+\usr\local\bin
+\usr\local\go\bin
+"@
+
+
+$wslpath | foreach-object {
+  $localstate = "$_\LocalState"
+  $scr = [scriptblock]::Create(@"
+    Add-MpPreference -ExclusionPath '$localstate'
+    Write-Output 'Added_exclusion_for_$localstate'
+    `$dirs='$dirs'
+    `$rootfs = '$localstate' + '\rootfs'
+    `$dirs.split('`r`n') | ForEach-Object {
+        `$exclusion = `$rootfs + `$_ + '\*'
+        Add-MpPreference -ExclusionProcess `$exclusion
+	echo `"Added_exclusion_process_for_`$exclusion`"
+    }
+"@)
+  Run-Elevated $scr
+
+}
+
+
 ## ---------------
-# Set sshd
+# Set Dotfiles
 
-
-#wsl --set-default-version 2
-
-## Define variables
-#$customDistroName = "UbuntuWsl1"
-#$installPath = "$env:LOCALAPPDATA\Packages\$customDistroName"
-#$tarGzPath = "$env:TEMP\ubuntu.tar.gz"
-#
-## Get the latest Ubuntu WSL image download link
-#Write-Output "Fetching the latest Ubuntu WSL image link..."
-#$wslImageLink = Get-LatestUbuntuWSLLink
-#Write-Output "Latest Ubuntu WSL image link: $wslImageLink"
-#
-## Download the latest Ubuntu WSL image
-#Write-Output "Downloading the latest Ubuntu WSL image..."
-#Invoke-WebRequest -Uri $wslImageLink -OutFile $tarGzPath
-#
-## Create installation directory if it doesn't exist
-#if (-Not (Test-Path $installPath)) {
-#    New-Item -ItemType Directory -Path $installPath | Out-Null
-#}
-#
-## Import the downloaded root filesystem as a custom WSL distro
-#Write-Output "Importing Ubuntu as $customDistroName..."
-#wsl --import $customDistroName $installPath $tarGzPath --version 1
-#
-## Clean up the downloaded tar.gz file
-#Remove-Item $tarGzPath
-#
-## Verify installation
-#$wslList = wsl --list --verbose
-#if ($wslList -match $customDistroName) {
-#    Write-Output "$customDistroName installation successful."
-#} else {
-#    Write-Output "$customDistroName installation failed."
-#    exit 1
-#}
-#
-## Initialize Terraform
-#Write-Output "Initializing Terraform..."
-#terraform init
-#
-#Write-Output "Script completed successfully."
+if ($DOTFILES_REPO) {
+  $local:split = $DOTFILES_REPO.split('#')
+  $local:repo = $split[0]
+  $local:branch = $split[1]
+  ssh $DistroName "bash -c `"cd &&
+  if [ ! -d `"dotfiles`" ]; then
+if [ -z `"$branch`" ]; then git clone $repo;
+else git clone -b $branch $repo; fi
+fi
+  cd dotfiles &&
+  ./init.sh
+`""
+}
 
