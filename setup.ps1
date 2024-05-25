@@ -1,4 +1,5 @@
 $ErrorActionPreference = "Stop"
+$DistroName = "Debian"
 
 # Function to run a script with elevated privileges and capture the output
 function Run-Elevated {
@@ -6,9 +7,9 @@ function Run-Elevated {
         [string]$scriptBlock
     )
     $tempFile = [System.IO.Path]::GetTempFileName()
-    $command = "powershell -NoProfile -ExecutionPolicy Bypass -Command `"& { $scriptBlock } | Out-File -FilePath '$tempFile'`""
-    Start-Process powershell -ArgumentList $command -Verb RunAs -Wait
-    Get-Content -Path $tempFile
+    Start-Process powershell -WindowStyle Minimized -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"& { $scriptBlock } *>> $tempFile`"" -Verb RunAs -Wait
+    cat $tempFile
+    rm $tempFile
 }
 
 
@@ -23,59 +24,83 @@ foreach ($line in $envContent) {
 
 
 # Check if WSL is enabled
-$script = {
-    $wslFeature = Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux
-    if ($wslFeature.State -ne "Enabled") {
-        Write-Output "WSL is not enabled."
-    } else {
-        Write-Output "WSL is enabled."
-    }
-}
-$wslStatus = Run-Elevated $script
-if ($wslStatus -contains "WSL is not enabled.") {
+$scr = [scriptblock]::Create("((Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux)).State")
+$wslStatus = Run-Elevated $scr
+#$wslStatus = "Enabled"
+if ($wslStatus -match "Enabled") {
+    Write-Host "WSL is already enabled."
+} else {
     Write-Host "WSL is not enabled. Enabling WSL..."
     Run-Elevated "Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux"
     Write-Host "WSL enabled. Please restart your computer and run the script again."
     exit
-} else {
-    Write-Host "WSL is already enabled."
 }
 wsl --update # install kernel update package if not exist
 
-$wslList = wsl -l -v
-if ($wslList -match "Debian" -or $wslList -match "Debian") {
-    Write-Host "Debian is already installed."
+$wslList = ($(wsl --list) -split "\r?\n" | Select-Object -Skip 1) -join "`n" -replace "`0", ""
+if ($wslList -match "$DistroName" -or $wslList -match "DistroName") {
+    Write-Host "$DistroName is already installed."
 } else {
     # Set the default WSL version to 1
     wsl --set-default-version 1
-    Write-Host "Installing Debian..."
-    $process = Start-Process -FilePath "wsl" -ArgumentList "--install -d Debian" -WindowStyle Minimized -PassThru
+    Write-Host "Installing $DistroName..."
+    $process = Start-Process -FilePath "wsl" -ArgumentList "--install -d $DistroName" -WindowStyle Minimized -PassThru
     #-NoNewWindow -PassThru
     #-WindowStyle Minimized -PassThru
     do {
-        write-host "waiting for Debian"
+        write-host "waiting for $DistroName"
         Start-Sleep -Seconds 1
-        $wslList = wsl --list --verbose | Select-String -Pattern "Debian"
+        $wslList = wsl --list --verbose | Select-String -Pattern "$DistroName"
 	$wslList = ($(wsl --list) -split "\r?\n" | Select-Object -Skip 1) -join "`n" -replace "`0", ""
-    } while (-not($wslList -match "Debian"))
-write-host "Stopping for now"
-wsl --terminate Debian
-Stop-Process -Name "Debian" -Force
-
-$USER = if ($envVariables['USER']) { $envVariables['USER'] } else { "admin" }
-$DOTFILES_REPO = $envVariables['DOTFILES_REPO']
-wsl -d Debian -- bash -c "adduser --disabled-password --gecos '' $USER && echo `"[user]\ndefault=$USER`" >> /etc/wsl.conf"
-wsl -d Debian -- bash -c "apt update &&
-apt install -y git openssh-server &&
-sed -i -E 's,^#?Port.*$,Port 2022,' /etc/ssh/sshd_config
-service ssh restart
-"
-wsl --terminate Debian
-wsl -d Debuan -- bash -c "sudo sh -c `"echo \`"${USER} ALL=(root) NOPASSWD: /usr/sbin/service ssh start\`" >/etc/sudoers.d/service-ssh-start`""
-
+    } while (-not($wslList -match "$DistroName"))
+    write-host "Stopping for now"
+    wsl --terminate $DistroName
+    Stop-Process -Name "$DistroName" -Force
 }
 
-wsl --set-default-version 2
+
+## ---------------
+# Set PASSWD, sshd
+#
+$USER = if ($envVariables['USER']) { $envVariables['USER'] } else { "admin" }
+$DOTFILES_REPO = $envVariables['DOTFILES_REPO']
+
+write-host "Setting WSL 1 $DistroName"
+# as root
+wsl -d $DistroName -- bash -c "if [ -z `"`$(ls -d /home/$USER 2> /dev/null)`" ]; then adduser --disabled-password --gecos '' $USER; fi && if [ -z `"`$(ls /etc/sudoers.d/$USER 2> /dev/null)`" ]; then echo 'Setting NOPASSWD' && echo $USER' ALL=(ALL:ALL) NOPASSWD: ALL' > /etc/sudoers.d/$USER ; fi
+if [ -z `"`$(grep '^default=$USER' /etc/wsl.conf 2> /dev/null)`" ];then echo Makeing $USER default && echo '[user]' >> /etc/wsl.conf && echo `"default=$USER`" >> /etc/wsl.conf ; fi
+apt update &&
+apt install -y git openssh-server &&
+sed -i -E 's,^#?Port.*$,Port 3022,' /etc/ssh/sshd_config &&
+echo All done
+"
+if (-not $LASTEXITCODE) {
+  # restart to use default user
+  wsl --terminate $DistroName
+  # as ruser
+  wsl -d $DistroName -- bash -c "ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -q -N '' &&
+echo Created ssh key &&
+cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys &&
+echo ---------------- &&
+cat ~/.ssh/id_rsa.pub &&
+echo ----------------
+"
+}
+
+# setup scheduler task for start sshd
+$taskName = "Start WSL sshd"
+$existingScheduler = Get-ScheduledTask -TaskName $taskName -Erroraction silentlycontinue
+if (-not $existingScheduler) {
+  Start-Process powershell -WindowStyle Minimized -ArgumentList "-ExecutionPolicy Bypass -file `"$PSScriptRoot\registerStartupTask.ps1`" `"$taskName`" `"wsl bash -c 'sudo /usr/sbin/service ssh start'`"" -Verb RunAs -Wait 
+  Get-ScheduledTask -TaskName $taskName #-Erroraction silentlycontinue
+}
+
+
+## ---------------
+# Set sshd
+
+
+#wsl --set-default-version 2
 
 ## Define variables
 #$customDistroName = "UbuntuWsl1"
