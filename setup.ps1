@@ -155,6 +155,47 @@ $wslpath | foreach-object {
 
 }
 
+## ---------------
+# Install Podman
+#
+$json = Invoke-WebRequest -uri "https://api.github.com/repos/containers/podman/releases/latest" | % Content | ConvertFrom-Json
+$asset = $json.assets | Where-Object { $_.browser_download_url -match '\.exe$' } | Select-Object -First 1
+if (Test-Path $asset.name -PathType Leaf) {
+  echo $asset.name exists
+  $headers=Invoke-WebRequest -Method head -Uri $asset.browser_download_url |% headers
+  $size=get-item $asset.name |% length
+  if ($size -lt $headers['Content-Length']) {
+    echo 'not finished, downloading again'
+    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile ".\$($asset.name)"
+  } else {
+    echo 'using existing'
+  }
+} else {
+  Invoke-WebRequest -Uri $asset.browser_download_url -OutFile ".\$($asset.name)"
+}
+Start-Process -Wait -FilePath $asset.name -Argument "/quiet /NORESTART" -PassThru
+
+
+## ---------------
+# Install Podman desktop
+#
+$json = Invoke-WebRequest -uri "https://api.github.com/repos/containers/podman-desktop/releases/latest" | % Content | ConvertFrom-Json
+$asset = $json.assets | Where-Object { $_.browser_download_url -match '\.exe$' } | Select-Object -First 1
+if (Test-Path $asset.name -PathType Leaf) {
+  echo $asset.name exists
+  $headers=Invoke-WebRequest -Method head -Uri $asset.browser_download_url |% headers
+  $size=get-item $asset.name |% length
+  if ($size -lt $headers['Content-Length']) {
+    echo 'not finished, downloading again'
+    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile ".\$($asset.name)"
+  } else {
+    echo 'using existing'
+  }
+} else {
+  Invoke-WebRequest -Uri $asset.browser_download_url -OutFile ".\$($asset.name)"
+}
+Start-Process -Wait -FilePath $asset.name -Argument "/S" -PassThru
+
 
 ## ---------------
 # Set Dotfiles
