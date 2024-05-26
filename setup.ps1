@@ -37,6 +37,15 @@ if ($wslStatus -match "Enabled") {
 }
 wsl --update # install kernel update package if not exist
 
+if (-not (Test-Path "$env:USERPROFILE\.wslconfig" -PathType Leaf)) {
+  echo Setting .wslconfig
+  $numberOfCores = Get-WmiObject -class win32_processor -Property "numberOfCores" |  % "numberOfCores"
+  echo Number of cores: $numberOfCores
+  $halfMemory = (Get-CimInstance Win32_PhysicalMemory | Measure-Object -Property capacity -Sum).sum /2mb
+  echo Half of physical memory: $($halfMemory)MB
+  [string]::join("`n", "[wsl2]", "memory=$($halfMemory)MB", "processors=$numberOfCores", "", "") | sC $env:USERPROFILE\.wslconfig
+}
+
 $wslList = ($(wsl --list) -split "\r?\n" | Select-Object -Skip 1) -join "`n" -replace "`0", ""
 if ($wslList -match "$DistroName" -or $wslList -match "DistroName") {
     Write-Host "$DistroName is already installed."
