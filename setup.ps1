@@ -1,6 +1,8 @@
 $ErrorActionPreference = "Stop"
 $DistroName = "Debian"
 
+dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
+
 # Function to run a script with elevated privileges and capture the output
 function Run-Elevated {
     param (
@@ -21,6 +23,11 @@ foreach ($line in $envContent) {
         $envVariables[$Matches['key']] = $Matches['value']
     }
 }
+
+
+echo envVariables:
+$envVariables
+
 
 
 # Check if WSL is enabled
@@ -164,62 +171,62 @@ $wslpath | foreach-object {
 
 }
 
-## ---------------
-# Install Podman
-#
-$json = Invoke-WebRequest -uri "https://api.github.com/repos/containers/podman/releases/latest" | % Content | ConvertFrom-Json
-$asset = $json.assets | Where-Object { $_.browser_download_url -match '\.exe$' } | Select-Object -First 1
-if (Test-Path $asset.name -PathType Leaf) {
-  echo $asset.name exists
-  $headers=Invoke-WebRequest -Method head -Uri $asset.browser_download_url |% headers
-  $size=get-item $asset.name |% length
-  if ($size -lt $headers['Content-Length']) {
-    echo 'not finished, downloading again'
-    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile ".\$($asset.name)"
-  } else {
-    echo 'using existing'
-  }
-} else {
-  Invoke-WebRequest -Uri $asset.browser_download_url -OutFile ".\$($asset.name)"
-}
-Start-Process -Wait -FilePath $asset.name -Argument "/quiet /NORESTART" -PassThru
-
-
-## ---------------
-# Install Podman desktop
-#
-$json = Invoke-WebRequest -uri "https://api.github.com/repos/containers/podman-desktop/releases/latest" | % Content | ConvertFrom-Json
-$asset = $json.assets | Where-Object { $_.browser_download_url -match '\.exe$' } | Select-Object -First 1
-if (Test-Path $asset.name -PathType Leaf) {
-  echo $asset.name exists
-  $headers=Invoke-WebRequest -Method head -Uri $asset.browser_download_url |% headers
-  $size=get-item $asset.name |% length
-  if ($size -lt $headers['Content-Length']) {
-    echo 'not finished, downloading again'
-    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile ".\$($asset.name)"
-  } else {
-    echo 'using existing'
-  }
-} else {
-  Invoke-WebRequest -Uri $asset.browser_download_url -OutFile ".\$($asset.name)"
-}
-Start-Process -Wait -FilePath $asset.name -Argument "/S" -PassThru
-
-
-## ---------------
-# Set Dotfiles
-
-if ($DOTFILES_REPO) {
-  $local:split = $DOTFILES_REPO.split('#')
-  $local:repo = $split[0]
-  $local:branch = $split[1]
-  ssh $DistroName "bash -c `"cd &&
-  if [ ! -d `"dotfiles`" ]; then
-if [ -z `"$branch`" ]; then git clone $repo;
-else git clone -b $branch $repo; fi
-fi
-  cd dotfiles &&
-  ./init.sh
-`""
-}
+# ## ---------------
+# # Install Podman
+# #
+# $json = Invoke-WebRequest -uri "https://api.github.com/repos/containers/podman/releases/latest" | % Content | ConvertFrom-Json
+# $asset = $json.assets | Where-Object { $_.browser_download_url -match '\.exe$' } | Select-Object -First 1
+# if (Test-Path $asset.name -PathType Leaf) {
+#   echo $asset.name exists
+#   $headers=Invoke-WebRequest -Method head -Uri $asset.browser_download_url |% headers
+#   $size=get-item $asset.name |% length
+#   if ($size -lt $headers['Content-Length']) {
+#     echo 'not finished, downloading again'
+#     Invoke-WebRequest -Uri $asset.browser_download_url -OutFile ".\$($asset.name)"
+#   } else {
+#     echo 'using existing'
+#   }
+# } else {
+#   Invoke-WebRequest -Uri $asset.browser_download_url -OutFile ".\$($asset.name)"
+# }
+# Start-Process -Wait -FilePath $asset.name -Argument "/quiet /NORESTART" -PassThru
+# 
+# 
+# ## ---------------
+# # Install Podman desktop
+# #
+# $json = Invoke-WebRequest -uri "https://api.github.com/repos/containers/podman-desktop/releases/latest" | % Content | ConvertFrom-Json
+# $asset = $json.assets | Where-Object { $_.browser_download_url -match '\.exe$' } | Select-Object -First 1
+# if (Test-Path $asset.name -PathType Leaf) {
+#   echo $asset.name exists
+#   $headers=Invoke-WebRequest -Method head -Uri $asset.browser_download_url |% headers
+#   $size=get-item $asset.name |% length
+#   if ($size -lt $headers['Content-Length']) {
+#     echo 'not finished, downloading again'
+#     Invoke-WebRequest -Uri $asset.browser_download_url -OutFile ".\$($asset.name)"
+#   } else {
+#     echo 'using existing'
+#   }
+# } else {
+#   Invoke-WebRequest -Uri $asset.browser_download_url -OutFile ".\$($asset.name)"
+# }
+# Start-Process -Wait -FilePath $asset.name -Argument "/S" -PassThru
+# 
+# 
+# ## ---------------
+# # Set Dotfiles
+# 
+# if ($DOTFILES_REPO) {
+#   $local:split = $DOTFILES_REPO.split('#')
+#   $local:repo = $split[0]
+#   $local:branch = $split[1]
+#   ssh $DistroName "bash -c `"cd &&
+#   if [ ! -d `"dotfiles`" ]; then
+# if [ -z `"$branch`" ]; then git clone $repo;
+# else git clone -b $branch $repo; fi
+# fi
+#   cd dotfiles &&
+#   ./init.sh
+# `""
+# }
 
