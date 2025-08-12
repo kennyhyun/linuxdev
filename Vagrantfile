@@ -114,6 +114,4 @@ Vagrant.configure("2") do |config|
   # SHELL
   #config.vm.provision "file", source: "./.vagrant/machines/default/virtualbox/private_key", destination: "$HOME/.ssh/id_rsa"
   config.vm.provision "shell", inline: "echo '. /vagrant/config/env_var.sh' > /etc/profile.d/env_var.sh", run: "always"
-  config.vm.provision "docker",
-    images: ["stanback/alpine-samba", "docker/dockerfile:1.0-experimental"]
 end

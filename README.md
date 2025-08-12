@@ -143,6 +143,20 @@ The script will disable Hyper-v (WSL2) and replace with VM and you can also use 
 
 It's okay to repeat this bootstrap script if something went wrong.
 
+You can customise VM by setting .env file manually
+
+```
+DOCKER_DISK_SIZE_GB=45
+DOTFILES_REPO=https://gitlab.imaginetoolbox.com/whitech-pty-ltd/dotfiles.git
+HOST_PATHS=~/Projects,~/ImagineKiosk/centralised_data,~/ImagineKiosk/central_jobs,~/ImagineKiosk/CENTRAL_DATA_ASSET_PATH
+__VMHOSTS__127_0_0_1=localstack
+__VMHOSTS__127_0_0_1_distinguish=kiosk.whitechstage.com
+__VM__PROJECT_DIR="~/Projects/imagine-online"
+__VM__WHITECH=1
+FONT_URLS=https://www.fontsquirrel.com/fonts/download/camingocode
+PATCHED_FONT_URLS=https://github.com/tonsky/FiraCode/releases/download/5.2/Fira_Code_v5.2.zip
+```
+
 ### After finished bootstraping
 
 Copy and paste ssh public key to use in Github and where ever it's required.

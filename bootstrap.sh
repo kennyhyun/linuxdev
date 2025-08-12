@@ -2,6 +2,9 @@
 
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
+noStartupScript=$(echo ${@} | grep -w '\-\-noStartupScript' >> /dev/null && echo 1 || echo "")
+echo "bootstrap.sh:" $@
+
 set +e
 
 sed="sed"
@@ -15,10 +18,16 @@ echo =================================
 echo Bootstrap vagrant machine
 echo =================================
 
-source .env
+source ./.env
 
 expand_disk_size=${EXPAND_DISK_GB:-4}
 swapfile=${SWAPFILE:-}
+COMPOSE_VERSION=${_VER_DOCKER_COMPOSE}
+
+if [ "$_VER_DOCKER" ]; then
+  # setting docker version for provisioning
+  sed -i "s/VERSION=.*/VERSION=$_VER_DOCKER/" $SCRIPT_DIR/config/env_var.sh
+fi
 
 # get username from env or prompt
 username=$VAGRANT_USERNAME
@@ -103,6 +112,38 @@ ssh="ssh -F $SSH_CONFIG.root root"
 docker_port=${DOCKER_PORT:-2376}
 ip_address=${IP_ADDRESS:-192.168.99.123}
 $ssh "touch ~/.hushlogin"
+
+$ssh << EOSSH
+docker -v && exit;
+
+echo "====> Installing Docker"
+docker_version=\$(grep '^_VER_DOCKER=' /vagrant/.env |tail -1 |cut -d'=' -f2)
+echo "Version: \$docker_version"
+
+apt-get update
+apt-get install -y ca-certificates curl
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+
+echo \
+  "deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
+  \$(. /etc/os-release && echo "\$VERSION_CODENAME") stable" | \
+  tee /etc/apt/sources.list.d/docker.list > /dev/null
+apt-get update
+
+apt list -a docker-ce
+
+if [ -z "\$docker_version" ];then
+  apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+else
+  apt_docker_ver=\$(apt list -a docker-ce |grep -m1 \${docker_version} |cut -d' ' -f2)
+  echo    "apt-get install -y docker-ce=\${apt_docker_ver} docker-ce-cli=\${apt_docker_ver} containerd.io docker-buildx-plugin docker-compose-plugin"
+  apt-get install -y docker-ce=\${apt_docker_ver} docker-ce-cli=\${apt_docker_ver} containerd.io docker-buildx-plugin docker-compose-plugin
+fi
+docker -v
+
+EOSSH
 
 if [ -z "$exists" ]; then
   echo "user $username not found"
@@ -308,6 +349,8 @@ if [ -f "/dummy" ]; then
 fi
 EOSSH
 
+echo "Creating Docker Certs"
+
 if [ -d ~/.docker/certs.$machine_name ]; then
   echo "--------
 ~/.docker/certs.$machine_name already exists, skip creating Docker certs"
@@ -333,6 +376,7 @@ fi
 mkdir -p $SCRIPT_DIR/data/fonts
 touch $SCRIPT_DIR/data/fonts/.download_start_file
 if [ "$FONT_URLS" ] || [ "$PATCHED_FONT_URLS" ]; then
+echo "Installing fonts"
 ssh $machine_name "bash /vagrant/scripts/download-fonts.sh \"$FONT_URLS\" \"$PATCHED_FONT_URLS\""
 downloaded=$(find $SCRIPT_DIR/data/fonts -maxdepth 1 -newer $SCRIPT_DIR/data/fonts/.download_start_file -type f -name "*.ttf")
 if [ "$downloaded" ]; then
@@ -351,6 +395,9 @@ if [ "$downloaded" ]; then
 fi
 fi
 
+#### TODO: upgrade docker if required
+
+echo "Installing dotfiles"
 #### init dotfiles
 if [ -z "$DOTFILES_REPO" ]; then
   echo "---------
@@ -359,7 +406,7 @@ else
   ssh $machine_name << EOSSH
 if ! [ -d ~/dotfiles ]; then
   echo "======= Cloning dotfiles"
-  git clone --recurse-submodules $DOTFILES_REPO ~/dotfiles && \
+  git clone $([ -n "$DOTFILES_BRANCH" ] && echo "--branch $DOTFILES_BRANCH") --recurse-submodules $DOTFILES_REPO ~/dotfiles && \
   init=\$(find dotfiles -maxdepth 1 -type f -executable -name 'init*' \
 -o -type f -executable -name "bootstrap*" -o -type f -executable -name "setup*" \
 -o -type f -executable -name "install*" \
@@ -378,12 +425,19 @@ fi
 EOSSH
 fi
 
+echo "Setting up host environments"
 if [ -z "$windows" ]; then
-  $SCRIPT_DIR/scripts/setup-launchd.sh
+  if [ -z "$noStartupScript" ]; then
+    $SCRIPT_DIR/scripts/setup-launchd.sh
+  fi
 else
   mkdir -p ~/Programs
   # add Windows Terminal Profile
-  powershell -executionPolicy ByPass -File $SCRIPT_DIR/add-machine-profile.ps1 $machine_name
+  if [ "$noStartupScript" ]; then
+    powershell -executionPolicy ByPass -File $SCRIPT_DIR/add-machine-profile.ps1 $machine_name -noStartupScript
+  else
+    powershell -executionPolicy ByPass -File $SCRIPT_DIR/add-machine-profile.ps1 $machine_name
+  fi
 
   if [ -f ~/Programs/docker_env.bat ]; then
     echo "-----

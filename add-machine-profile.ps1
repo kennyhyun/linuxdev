@@ -1,6 +1,10 @@
 $ErrorActionPreference = "Stop"
 $machine_name=$args[0]
 
+if ($args -contains "-noStartupScript") {
+  $noStartupScript=1
+}
+
 if (-not $machine_name) {
   write-host machine_name is required
   exit 1
@@ -12,6 +16,7 @@ $machine_title=(Get-Culture).TextInfo.ToTitleCase($machine_name)
 $PROFILE_DIR="$HOME\AppData\Local\Microsoft\Windows Terminal\Fragments\$machine_title"
 New-Item -ItemType Directory -Force -Path $PROFILE_DIR | Out-Null
 
+if (!$noStartupScript) {
 # add autostart shortcut
 $WshShell = New-Object -comObject WScript.Shell
 $ShortcutPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\start_$machine_name.lnk"
@@ -23,6 +28,7 @@ if (Test-Path -Path "$ShortcutPath" -PathType Leaf) {
   $Shortcut.Arguments = "up"
   $Shortcut.WorkingDirectory = "$PSScriptRoot"
   $Shortcut.Save()
+}
 }
 
 ######################
