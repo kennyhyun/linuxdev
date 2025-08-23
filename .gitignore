@@ -63,3 +63,5 @@ backup
 
 # qemu vm dir
 /vm
+
+*.bak
