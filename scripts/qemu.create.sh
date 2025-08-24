@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 # QEMU 완전 자동화 VM 생성 스크립트
 create_qemu_vm() {
@@ -7,7 +6,7 @@ create_qemu_vm() {
     local memory="$2"
     local cpus="$3"
     local disk_size="${4:-20}"
-    local username="${5:-debian}"
+    local username="${5:-admin}"
     
     echo "Creating QEMU VM: $vm_name (Debian 13 LTS)"
     echo "Memory: ${memory}MB, CPUs: $cpus, Disk: ${disk_size}GB"
@@ -189,6 +188,10 @@ EOF
     return 0
 }
 
+# ================================
+
+set -e
+
 # QEMU 설치 확인
 if ! command -v qemu-img >/dev/null 2>&1; then
     echo "Installing QEMU..."
@@ -201,4 +204,4 @@ if [ "$#" -lt 3 ]; then
     exit 1
 fi
 
-create_qemu_vm "$1" "$2" "$3" "$4" "$5"
+create_qemu_vm "$@"
