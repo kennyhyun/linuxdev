@@ -88,8 +88,8 @@ d-i mirror/http/proxy string
 d-i passwd/root-login boolean false
 d-i passwd/user-fullname string $username
 d-i passwd/username string $username
-d-i passwd/user-password password debian
-d-i passwd/user-password-again password debian
+d-i passwd/user-password-crypted password !
+d-i passwd/user-password-again password !
 d-i clock-setup/utc boolean true
 d-i time/zone string UTC
 d-i partman-auto/method string regular
@@ -104,6 +104,7 @@ d-i pkgsel/include string openssh-server sudo curl wget git
 d-i pkgsel/upgrade select none
 d-i grub-installer/only_debian boolean true
 d-i grub-installer/with_other_os boolean true
+d-i preseed/late_command string mkdir -p /target/mnt/host; mount -t 9p -o trans=virtio,version=9p2000.L host /target/mnt/host; /target/mnt/host/vm/setup.sh
 d-i finish-install/reboot_in_progress note
 d-i debian-installer/exit/halt boolean true
 EOF
@@ -144,6 +145,7 @@ EOF
         -bios /opt/homebrew/share/qemu/edk2-aarch64-code.fd \
         -drive file="$vm_dir/disk.qcow2",format=qcow2,if=virtio \
         -drive file="$iso_path",media=cdrom,readonly=on \
+        -virtfs local,path="$(pwd)",mount_tag=host,security_model=passthrough,id=host \
         -netdev user,id=net0,hostfwd=tcp::2222-:22 \
         -device virtio-net-pci,netdev=net0 \
         -monitor unix:$vm_dir/monitor.sock,server,nowait \
@@ -176,6 +178,38 @@ EOF
     if [ ! -f "$HOME/.ssh/id_rsa" ]; then
         ssh-keygen -t rsa -b 4096 -f "$HOME/.ssh/id_rsa" -N ""
     fi
+    
+    # VM 전용 키페어 생성
+    echo "Creating VM keypair..."
+    mkdir -p "$vm_dir/key"
+    if [ ! -f "$vm_dir/key/id_rsa" ]; then
+        ssh-keygen -t rsa -b 2048 -f "$vm_dir/key/id_rsa" -N "" -C "$username@$vm_name"
+        echo "✅ VM keypair created"
+    fi
+    
+    # 초기 설정 스크립트 생성
+    cat > "$vm_dir/setup.sh" << 'SETUP_EOF'
+#!/bin/bash
+# Setup user SSH keys
+mkdir -p /target/home/REPLACE_USERNAME/.ssh
+cp /target/mnt/host/vm/key/id_rsa.pub /target/home/REPLACE_USERNAME/.ssh/authorized_keys
+chown 1000:1000 /target/home/REPLACE_USERNAME/.ssh/authorized_keys
+chmod 600 /target/home/REPLACE_USERNAME/.ssh/authorized_keys
+chmod 700 /target/home/REPLACE_USERNAME/.ssh
+
+# Setup root SSH keys
+mkdir -p /target/root/.ssh
+cp /target/mnt/host/vm/key/id_rsa.pub /target/root/.ssh/authorized_keys
+chown 0:0 /target/root/.ssh/authorized_keys
+chmod 600 /target/root/.ssh/authorized_keys
+chmod 700 /target/root/.ssh
+
+# Setup sudoers
+echo 'REPLACE_USERNAME ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/98_REPLACE_USERNAME
+chmod 440 /target/etc/sudoers.d/98_REPLACE_USERNAME
+SETUP_EOF
+    sed -i "s/REPLACE_USERNAME/$username/g" "$vm_dir/setup.sh"
+    chmod +x "$vm_dir/setup.sh"
     
 
     

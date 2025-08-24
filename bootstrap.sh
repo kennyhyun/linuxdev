@@ -69,7 +69,10 @@ source ./.env
 echo =================================
 echo Welcome $username! Please wait a moment for bootstrapping $machine_name
 
-if [ -z "$windows" ]; then
+if [ "$windows" = 1 ]; then
+  vagrant plugin install vagrant-env
+  vagrant up
+else
   # VM이 이미 생성되었는지 확인
   if [ -f "./vm/disk.qcow2" ]; then
     if [ -f "./vm/install.status" ]; then
@@ -130,24 +133,44 @@ if [ -z "$windows" ]; then
   echo "To stop VM: ./halt.sh"
   echo "SSH access: ssh -p 2222 $username@localhost (password: debian)"
 
-else
-  echo "Windows support not implemented yet"
-  exit 1
 fi
 
-default_user_name=vagrant
-if [ -z "$windows" ]; then
+# Set platform-specific defaults
+if [ "$windows" = 1 ]; then
+  # Windows/Vagrant defaults
+  default_user_name="vagrant"
+  host_directory="/vagrant/"
+else
+  # Mac/QEMU defaults
   default_user_name="admin"
-fi
-host_directory=/vagrant/
-if [ -z "$windows" ]; then
-  host_directory=/mnt/host/
+  host_directory="/mnt/host/"
+  ssh_port="2222"
+  ssh_host="localhost"
 fi
 
 # create ssh config file
 SSH_CONFIG="$SCRIPT_DIR/ssh.config"
-if [ -z "$(grep $default_user_name $SSH_CONFIG)" ]; then
-  vagrant ssh-config >> $SSH_CONFIG
+if [ "$windows" = 1 ]; then
+  # Windows/Vagrant: Use vagrant ssh-config
+  if [ -z "$(grep $default_user_name $SSH_CONFIG)" ]; then
+    vagrant ssh-config >> $SSH_CONFIG
+  fi
+else
+  # Mac/QEMU: Create SSH config manually
+  if [ ! -f "$SSH_CONFIG" ] || [ -z "$(grep $default_user_name $SSH_CONFIG)" ]; then
+    cat > "$SSH_CONFIG" << EOF
+Host default
+  HostName $ssh_host
+  User $default_user_name
+  Port $ssh_port
+  UserKnownHostsFile /dev/null
+  StrictHostKeyChecking no
+  PasswordAuthentication no
+  IdentityFile $(pwd)/vm/key/id_rsa
+  IdentitiesOnly yes
+  LogLevel FATAL
+EOF
+  fi
 fi
 
 # create user with UID 1000
@@ -166,15 +189,20 @@ if [ -z "$admin_uid" ]; then
   echo ssh connection looks like failed
   exit -1;
 fi
-$ssh sudo cp -a /home/$default_user_name/.ssh /root/
-$ssh sudo chown -R root:root /root/.ssh
+
+# Skip SSH key copying for QEMU (already done during installation)
+if [ "$windows" = 1 ]; then
+  $ssh sudo cp -a /home/$default_user_name/.ssh /root/
+  $ssh sudo chown -R root:root /root/.ssh
+fi
+
 
 if [ -z "$(grep root $SSH_CONFIG.user)" ]; then
-$sed -e '0,/vagrant/{s/vagrant/'$username'/}' -e '0,/default/{s/default/'$machine_name/'}' $SSH_CONFIG >> $SSH_CONFIG.user
+$sed -e "0,/$default_user_name/{s/$default_user_name/$username/}" -e '0,/default/{s/default/'$machine_name'/}' $SSH_CONFIG >> $SSH_CONFIG.user
 fi
 
 if [ -z "$(grep root $SSH_CONFIG.root)" ]; then
-  $sed -e '0,/vagrant/{s/vagrant/root/}' -e '0,/default/{s/default/root/}' $SSH_CONFIG >> $SSH_CONFIG.root
+  $sed -e "0,/$default_user_name/{s/$default_user_name/root/}" -e '0,/default/{s/default/root/}' $SSH_CONFIG >> $SSH_CONFIG.root
 fi
 
 #### user root
@@ -216,7 +244,8 @@ docker -v
 
 EOSSH
 
-if [ -z "$exists" ]; then
+# Skip user creation for QEMU (already done during installation)
+if [ "$windows" = 1 ] && [ -z "$exists" ]; then
   echo "user $username not found"
   $ssh << EOSSH
 echo ---------------------
@@ -451,7 +480,7 @@ echo "Installing fonts"
 ssh $machine_name "bash ${host_directory}scripts/download-fonts.sh \"$FONT_URLS\" \"$PATCHED_FONT_URLS\""
 downloaded=$(find $SCRIPT_DIR/data/fonts -maxdepth 1 -newer $SCRIPT_DIR/data/fonts/.download_start_file -type f -name "*.ttf")
 if [ "$downloaded" ]; then
-  if [ "$windows" ]; then
+  if [ "$windows" = 1 ]; then
     while read file; do
       base=$(basename "$file")
       font_args="$font_args \"$base\""
@@ -497,7 +526,7 @@ EOSSH
 fi
 
 echo "Setting up host environments"
-if [ -z "$windows" ]; then
+if [ "$windows" -ne 1 ]; then
   if [ -z "$noStartupScript" ]; then
     $SCRIPT_DIR/scripts/setup-launchd.sh
   fi
