@@ -6,7 +6,7 @@ create_qemu_vm() {
     local memory="$2"
     local cpus="$3"
     local disk_size="${4:-20}"
-    local username="${5:-admin}"
+    local username="${5:-linuxdev}"
     
     echo "Creating QEMU VM: $vm_name (Debian 13 LTS)"
     echo "Memory: ${memory}MB, CPUs: $cpus, Disk: ${disk_size}GB"
@@ -72,7 +72,7 @@ create_qemu_vm() {
     #     echo "✅ Kernel and initrd extracted successfully"
     # fi
     
-    # for Automated Installation
+    # for Automated Install
     # Preseed 파일 생성 (완전 자동 설치)
     cat > "$vm_dir/preseed.cfg" << EOF
 d-i debian-installer/locale string en_AU
