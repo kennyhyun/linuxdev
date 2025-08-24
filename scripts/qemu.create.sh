@@ -74,7 +74,7 @@ create_qemu_vm() {
     
     # Preseed 파일 생성 (완전 자동 설치)
     cat > "$vm_dir/preseed.cfg" << EOF
-d-i debian-installer/locale string en_US
+d-i debian-installer/locale string en_AU
 d-i console-setup/ask_detect boolean false
 d-i console-setup/layoutcode string us
 d-i keyboard-configuration/xkb-keymap select us
@@ -82,7 +82,7 @@ d-i netcfg/choose_interface select auto
 d-i netcfg/get_hostname string $vm_name
 d-i netcfg/get_domain string local
 d-i mirror/country string manual
-d-i mirror/http/hostname string ftp.us.debian.org
+d-i mirror/http/hostname string ftp.au.debian.org
 d-i mirror/http/directory string /debian
 d-i mirror/http/proxy string
 d-i passwd/root-login boolean false
@@ -91,7 +91,7 @@ d-i passwd/username string $username
 d-i passwd/user-password-crypted password !
 d-i passwd/user-password-again password !
 d-i clock-setup/utc boolean true
-d-i time/zone string UTC
+d-i time/zone string Australia/Sydney
 d-i partman-auto/method string regular
 d-i partman-auto/choose_recipe select atomic
 d-i partman/confirm_write_new_label boolean true
