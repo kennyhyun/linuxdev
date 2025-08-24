@@ -72,6 +72,7 @@ create_qemu_vm() {
     #     echo "✅ Kernel and initrd extracted successfully"
     # fi
     
+    # for Automated Installation
     # Preseed 파일 생성 (완전 자동 설치)
     cat > "$vm_dir/preseed.cfg" << EOF
 d-i debian-installer/locale string en_AU
@@ -88,8 +89,8 @@ d-i mirror/http/proxy string
 d-i passwd/root-login boolean false
 d-i passwd/user-fullname string $username
 d-i passwd/username string $username
-d-i passwd/user-password-crypted password !
-d-i passwd/user-password-again password !
+d-i passwd/user-password-crypted password debian
+d-i passwd/user-password-again password debian
 d-i clock-setup/utc boolean true
 d-i time/zone string Australia/Sydney
 d-i partman-auto/method string regular

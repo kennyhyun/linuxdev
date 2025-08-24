@@ -23,9 +23,9 @@ source ./.env
 # get username from env or prompt
 username=$VM_USERNAME
 if [ -z "$VM_USERNAME" ]; then
-  echo -n "> Please enter default vm user name [admin]:"
+  echo -n "> Please enter default vm user name [linuxdev]:"
   read input
-  username=${input:-admin}
+  username=${input:-linuxdev}
   echo "VM_USERNAME=$username">> .env
 fi
 
@@ -139,7 +139,7 @@ if [ "$windows" = 1 ]; then
   host_directory="/vagrant/"
 else
   # Mac/QEMU defaults
-  default_user_name="admin"
+  default_user_name="linuxdev"
   host_directory="/mnt/host/"
   ssh_port="2222"
   ssh_host="localhost"
