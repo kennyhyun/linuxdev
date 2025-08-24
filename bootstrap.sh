@@ -75,10 +75,10 @@ if [ "$windows" = 1 ]; then
 else
   # VM이 이미 생성되었는지 확인
   if [ -f "./vm/disk.qcow2" ]; then
-    if [ -f "./vm/install.status" ]; then
-      status=$(cat ./vm/install.status)
+    if [ -f "./vm/.status" ]; then
+      status=$(tail -1 ./vm/.status)
       case "$status" in
-        "COMPLETED")
+        "COMPLETE")
           echo "VM '$machine_name' installation completed successfully"
           echo "To start VM: ./up.sh"
           echo "To stop VM: ./halt.sh"
@@ -120,12 +120,9 @@ else
   fi
   
   # VM 생성 및 설치
-  set -e
-  if ! ./scripts/qemu.create.sh "$machine_name" "${MEMORY:-2048}" "${CPUS:-2}" "${DISK_SIZE_GB:-20}" "$username"; then
-    echo "VM creation failed. Check the error above."
-    exit 1
-  fi
   set +e
+  ./scripts/qemu.create.sh "$machine_name" "${MEMORY:-2048}" "${CPUS:-2}" "${DISK_SIZE_GB:-20}" "$username"
+  set -e
   
   echo "\n=== VM Setup Complete ==="
   echo "VM files created in: ./vm/"

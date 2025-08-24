@@ -33,19 +33,38 @@ fi
 iso_filename="debian-13.0.0-arm64-netinst.iso"
 iso_path="$HOME/Downloads/$iso_filename"
 
-echo "Starting VM '$NAME' in headless mode... in '$VM_DIR'"
-echo "SSH: ssh -p 2222 kenny@localhost"
-echo "VNC: localhost:5901"
-qemu-system-aarch64 \
-    -M virt,highmem=on,gic-version=3 \
-    -accel hvf \
-    -cpu host \
-    -smp $CPUS \
-    -m ${MEMORY}M,slots=4,maxmem=$((MEMORY * 2))M \
-    -bios /opt/homebrew/share/qemu/edk2-aarch64-code.fd \
-    -drive file="$VM_DIR/disk.qcow2",format=qcow2,if=virtio \
-    -netdev user,id=net0,hostfwd=tcp::2222-:22 \
-    -device virtio-net-pci,netdev=net0 \
-    -monitor unix:$VM_DIR/monitor.sock,server,nowait \
-    -vnc 127.0.0.1:1,password=off \
-    -daemonize
+# 콘솔 모드 확인
+if [ "$1" = "--console" ] || [ "$1" = "-c" ]; then
+    echo "Starting VM '$NAME' in console mode... in '$VM_DIR'"
+    echo "Press Ctrl+A, X to exit console"
+    qemu-system-aarch64 \
+        -M virt,highmem=on,gic-version=3 \
+        -accel hvf \
+        -cpu host \
+        -smp $CPUS \
+        -m ${MEMORY}M,slots=4,maxmem=$((MEMORY * 2))M \
+        -bios /opt/homebrew/share/qemu/edk2-aarch64-code.fd \
+        -drive file="$VM_DIR/disk.qcow2",format=qcow2,if=virtio \
+        -netdev user,id=net0,hostfwd=tcp::2222-:22 \
+        -device virtio-net-pci,netdev=net0 \
+        -monitor unix:$VM_DIR/monitor.sock,server,nowait \
+        -nographic
+else
+    echo "Starting VM '$NAME' in headless mode... in '$VM_DIR'"
+    echo "SSH: ssh -p 2222 kenny@localhost"
+    echo "VNC: localhost:5901"
+    echo "Console: ./up.sh --console"
+    qemu-system-aarch64 \
+        -M virt,highmem=on,gic-version=3 \
+        -accel hvf \
+        -cpu host \
+        -smp $CPUS \
+        -m ${MEMORY}M,slots=4,maxmem=$((MEMORY * 2))M \
+        -bios /opt/homebrew/share/qemu/edk2-aarch64-code.fd \
+        -drive file="$VM_DIR/disk.qcow2",format=qcow2,if=virtio \
+        -netdev user,id=net0,hostfwd=tcp::2222-:22 \
+        -device virtio-net-pci,netdev=net0 \
+        -monitor unix:$VM_DIR/monitor.sock,server,nowait \
+        -vnc 127.0.0.1:1,password=off \
+        -daemonize
+fi

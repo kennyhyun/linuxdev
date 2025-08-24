@@ -46,31 +46,31 @@ create_qemu_vm() {
     echo "Using vm_dir: $vm_dir"
     mkdir -p "$vm_dir"
     
-    # ISO에서 kernel과 initrd 추출
-    local extract_dir="$vm_dir/extract"
-    if [ ! -f "$extract_dir/vmlinuz" ] || [ ! -f "$extract_dir/initrd.gz" ]; then
-        echo "Extracting kernel and initrd from ISO..."
-        mkdir -p "$extract_dir"
+    # # ISO에서 kernel과 initrd 추출
+    # local extract_dir="$vm_dir/extract"
+    # if [ ! -f "$extract_dir/vmlinuz" ] || [ ! -f "$extract_dir/initrd.gz" ]; then
+    #     echo "Extracting kernel and initrd from ISO..."
+    #     mkdir -p "$extract_dir"
         
-        # 7zip 설치 확인
-        if ! command -v 7z >/dev/null 2>&1; then
-            echo "Installing 7zip..."
-            brew install p7zip
-        fi
+    #     # 7zip 설치 확인
+    #     if ! command -v 7z >/dev/null 2>&1; then
+    #         echo "Installing 7zip..."
+    #         brew install p7zip
+    #     fi
         
-        # ISO에서 파일 추출
-        echo "Extracting files from ISO..."
-        7z x "$iso_path" -o"$extract_dir/iso_content" "install.a64/vmlinuz" "install.a64/initrd.gz" -y
+    #     # ISO에서 파일 추출
+    #     echo "Extracting files from ISO..."
+    #     7z x "$iso_path" -o"$extract_dir/iso_content" "install.a64/vmlinuz" "install.a64/initrd.gz" -y
         
-        # 파일 이동
-        mv "$extract_dir/iso_content/install.a64/vmlinuz" "$extract_dir/vmlinuz"
-        mv "$extract_dir/iso_content/install.a64/initrd.gz" "$extract_dir/initrd.gz"
+    #     # 파일 이동
+    #     mv "$extract_dir/iso_content/install.a64/vmlinuz" "$extract_dir/vmlinuz"
+    #     mv "$extract_dir/iso_content/install.a64/initrd.gz" "$extract_dir/initrd.gz"
         
-        # 임시 폴더 삭제
-        rm -rf "$extract_dir/iso_content"
+    #     # 임시 폴더 삭제
+    #     rm -rf "$extract_dir/iso_content"
         
-        echo "✅ Kernel and initrd extracted successfully"
-    fi
+    #     echo "✅ Kernel and initrd extracted successfully"
+    # fi
     
     # Preseed 파일 생성 (완전 자동 설치)
     cat > "$vm_dir/preseed.cfg" << EOF
@@ -104,11 +104,16 @@ d-i pkgsel/include string openssh-server sudo curl wget git
 d-i pkgsel/upgrade select none
 d-i grub-installer/only_debian boolean true
 d-i grub-installer/with_other_os boolean true
-d-i preseed/late_command string mkdir -p /target/mnt/host; mount -t 9p -o trans=virtio,version=9p2000.L host /target/mnt/host; /target/mnt/host/vm/setup.sh
+d-i preseed/late_command string in-target mkdir -p /mnt/host; in-target mount -t 9p -o trans=virtio,version=9p2000.L host /mnt/host || true; if [ -f /target/mnt/host/vm/setup.sh ]; then /target/mnt/host/vm/setup.sh; else echo 'Setup script not found, skipping'; fi
 d-i finish-install/reboot_in_progress note
 d-i debian-installer/exit/halt boolean true
 EOF
     
+    
+  if [ -f $vm_dir/.status ]; then
+    vm_installed=$(grep INSTALL_COMPLETE $vm_dir/.status)
+  fi
+  if [ -z "$vm_installed" ]; then
     # 사용 가능한 포트 찾기
     local http_port=8080
     while lsof -i :$http_port > /dev/null 2>&1; do
@@ -128,67 +133,18 @@ EOF
         echo "Creating VM disk image..."
         qemu-img create -f qcow2 "$vm_dir/disk.qcow2" "${disk_size}G"
     fi
-    
 
-    # 설치용 임시 시작
-    # after booting,
-    # choose Advanced and Auto installation
-    # and paste http://10.0.2.2:8080/preseed.cfg
-    
-    echo "Starting automated Debian installation..."
-    qemu-system-aarch64 \
-        -M virt,highmem=on,gic-version=3 \
-        -accel hvf \
-        -cpu host \
-        -smp $cpus \
-        -m ${memory}M \
-        -bios /opt/homebrew/share/qemu/edk2-aarch64-code.fd \
-        -drive file="$vm_dir/disk.qcow2",format=qcow2,if=virtio \
-        -drive file="$iso_path",media=cdrom,readonly=on \
-        -virtfs local,path="$(pwd)",mount_tag=host,security_model=passthrough,id=host \
-        -netdev user,id=net0,hostfwd=tcp::2222-:22 \
-        -device virtio-net-pci,netdev=net0 \
-        -monitor unix:$vm_dir/monitor.sock,server,nowait \
-        -vnc 127.0.0.1:1,password=off \
-        -nographic
-    
-    # HTTP 서버 종료
-    kill $http_pid 2>/dev/null || true
-    
-    if [ $? -eq 0 ]; then
-        echo "✅ VM started successfully in background"
-        echo "📡 SSH will be available on port 2222 after installation"
-        echo "⏱️  Installation takes about 10-15 minutes"
-        
-        # 설치 상태 파일 생성
-        echo "INSTALLING" > "$vm_dir/install.status"
-        echo "$(date)" > "$vm_dir/install.log"
-        echo "Installation started for $vm_name" >> "$vm_dir/install.log"
-        
-        # 설치 완료 확인 스크립트 실행
-        ./scripts/qemu.wait-install.sh "$vm_dir" "$username" &
-    else
-        echo "❌ Failed to start VM"
-        return 1
-    fi
-    
-    # VM 설정 완료
-    
-    # SSH 키 생성
-    if [ ! -f "$HOME/.ssh/id_rsa" ]; then
-        ssh-keygen -t rsa -b 4096 -f "$HOME/.ssh/id_rsa" -N ""
-    fi
-    
-    # VM 전용 키페어 생성
-    echo "Creating VM keypair..."
+    # VM 전용 키페어 생성 (설치 전에 필요)
     mkdir -p "$vm_dir/key"
     if [ ! -f "$vm_dir/key/id_rsa" ]; then
+        echo "Creating VM keypair..."
         ssh-keygen -t rsa -b 2048 -f "$vm_dir/key/id_rsa" -N "" -C "$username@$vm_name"
         echo "✅ VM keypair created"
     fi
     
-    # 초기 설정 스크립트 생성
-    cat > "$vm_dir/setup.sh" << 'SETUP_EOF'
+    # 초기 설정 스크립트 생성 (설치 전에 필요)
+    if [ ! -f "$vm_dir/setup.sh" ]; then
+        cat > "$vm_dir/setup.sh" << 'SETUP_EOF'
 #!/bin/bash
 # Setup user SSH keys
 mkdir -p /target/home/REPLACE_USERNAME/.ssh
@@ -208,9 +164,75 @@ chmod 700 /target/root/.ssh
 echo 'REPLACE_USERNAME ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/98_REPLACE_USERNAME
 chmod 440 /target/etc/sudoers.d/98_REPLACE_USERNAME
 SETUP_EOF
-    sed -i "s/REPLACE_USERNAME/$username/g" "$vm_dir/setup.sh"
-    chmod +x "$vm_dir/setup.sh"
+        if [[ $(uname -s) == "Darwin" ]]; then
+            gsed -i "s/REPLACE_USERNAME/$username/g" "$vm_dir/setup.sh"
+        else
+            sed -i "s/REPLACE_USERNAME/$username/g" "$vm_dir/setup.sh"
+        fi
+        chmod +x "$vm_dir/setup.sh"
+    fi
+
+    # 설치용 임시 시작
+    # after booting,
+    # choose Advanced and Auto installation
+    # and paste http://10.0.2.2:8080/preseed.cfg
     
+    echo "Starting automated Debian installation..."
+    echo "📋 Preseed URL: http://10.0.2.2:$http_port/preseed.cfg"
+    echo "🔧 Boot options: auto=true priority=critical preseed/url=http://10.0.2.2:$http_port/preseed.cfg"
+    echo "⚠️  Manual step required: Select 'Advanced options' -> 'Automated install' and enter the preseed URL above"
+    
+    # 설치 시작 상태 기록
+    echo "INSTALLING" >> "$vm_dir/.status"
+    echo "$(date) - Installation started" > "$vm_dir/install.log"
+    echo "Installation started for $vm_name" >> "$vm_dir/install.log"
+    
+    qemu-system-aarch64 \
+        -M virt,highmem=on,gic-version=3 \
+        -accel hvf \
+        -cpu host \
+        -smp $cpus \
+        -m ${memory}M \
+        -bios /opt/homebrew/share/qemu/edk2-aarch64-code.fd \
+        -drive file="$vm_dir/disk.qcow2",format=qcow2,if=virtio \
+        -drive file="$iso_path",media=cdrom,readonly=on \
+        -virtfs local,path="$(pwd)",mount_tag=host,security_model=passthrough,id=host \
+        -netdev user,id=net0,hostfwd=tcp::2222-:22 \
+        -device virtio-net-pci,netdev=net0 \
+        -monitor unix:$vm_dir/monitor.sock,server,nowait \
+        -vnc 127.0.0.1:1,password=off \
+        -nographic
+    
+    # HTTP 서버 종료 및 설치 완료 기록
+    kill $http_pid 2>/dev/null || true
+    echo "✅ VM installation completed"
+  fi
+
+    # Start the VM
+    echo "Starting VM..."
+    ./up.sh
+    
+    # Wait until SSH server is ready on port 2222
+    echo "Waiting for SSH server to be ready..."
+    for i in {1..60}; do
+        if nc -z localhost 2222 2>/dev/null; then
+            echo "✅ SSH server is ready on port 2222"
+            break
+        fi
+        if [ $i -eq 60 ]; then
+            echo "❌ Timeout waiting for SSH server"
+            return 1
+        fi
+        sleep 2
+    done
+    
+    # 설치 완료 상태 기록
+    echo "INSTALL_COMPLETE" >> "$vm_dir/.status"
+    
+    echo "$(date) - Installation completed" >> "$vm_dir/install.log"
+    echo "Installation completed for $vm_name" >> "$vm_dir/install.log"
+    
+    # VM 설정 완료
 
     
     echo "VM created at: $vm_dir"
@@ -230,6 +252,14 @@ set -e
 if ! command -v qemu-img >/dev/null 2>&1; then
     echo "Installing QEMU..."
     brew install qemu
+fi
+
+# GNU sed 설치 및 설정 (macOS)
+if [[ $(uname -s) == "Darwin" ]]; then
+    if ! command -v gsed >/dev/null 2>&1; then
+        echo "Installing GNU sed..."
+        brew install gnu-sed
+    fi
 fi
 
 # 메인 실행
