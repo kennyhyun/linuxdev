@@ -72,8 +72,17 @@ create_qemu_vm() {
     #     echo "✅ Kernel and initrd extracted successfully"
     # fi
     
+    # 사용 가능한 포트 찾기 (미리 정의)
+    local http_port=8080
+    while lsof -i :$http_port > /dev/null 2>&1; do
+        http_port=$((http_port + 1))
+    done
+    
     # for Automated Install
     # Preseed 파일 생성 (완전 자동 설치)
+    # HTTP 포트와 사용자명을 preseed에 삽입하기 위해 임시 변수 사용
+    local preseed_late_cmd="wget -O /tmp/id_rsa.pub http://10.0.2.2:$http_port/key/id_rsa.pub && mkdir -p /target/home/$username/.ssh /target/root/.ssh && cp /tmp/id_rsa.pub /target/home/$username/.ssh/authorized_keys && cp /tmp/id_rsa.pub /target/root/.ssh/authorized_keys && chown 1000:1000 /target/home/$username/.ssh/authorized_keys && chmod 600 /target/home/$username/.ssh/authorized_keys && chmod 700 /target/home/$username/.ssh && chmod 600 /target/root/.ssh/authorized_keys && chmod 700 /target/root/.ssh && echo '$username ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/98_$username && chmod 440 /target/etc/sudoers.d/98_$username"
+    
     cat > "$vm_dir/preseed.cfg" << EOF
 d-i debian-installer/locale string en_AU
 d-i console-setup/ask_detect boolean false
@@ -89,7 +98,7 @@ d-i mirror/http/proxy string
 d-i passwd/root-login boolean false
 d-i passwd/user-fullname string $username
 d-i passwd/username string $username
-d-i passwd/user-password-crypted password debian
+d-i passwd/user-password password debian
 d-i passwd/user-password-again password debian
 d-i clock-setup/utc boolean true
 d-i time/zone string Australia/Sydney
@@ -105,7 +114,7 @@ d-i pkgsel/include string openssh-server sudo curl wget git
 d-i pkgsel/upgrade select none
 d-i grub-installer/only_debian boolean true
 d-i grub-installer/with_other_os boolean true
-d-i preseed/late_command string in-target mkdir -p /mnt/host; in-target mount -t 9p -o trans=virtio,version=9p2000.L host /mnt/host || true; if [ -f /target/mnt/host/vm/setup.sh ]; then /target/mnt/host/vm/setup.sh; else echo 'Setup script not found, skipping'; fi
+d-i preseed/late_command string $preseed_late_cmd
 d-i finish-install/reboot_in_progress note
 d-i debian-installer/exit/halt boolean true
 EOF
@@ -115,11 +124,6 @@ EOF
     vm_installed=$(grep INSTALL_COMPLETE $vm_dir/.status)
   fi
   if [ -z "$vm_installed" ]; then
-    # 사용 가능한 포트 찾기
-    local http_port=8080
-    while lsof -i :$http_port > /dev/null 2>&1; do
-        http_port=$((http_port + 1))
-    done
     echo "Using HTTP port: $http_port"
     
     # HTTP 서버로 preseed 제공
@@ -197,7 +201,6 @@ SETUP_EOF
         -bios /opt/homebrew/share/qemu/edk2-aarch64-code.fd \
         -drive file="$vm_dir/disk.qcow2",format=qcow2,if=virtio \
         -drive file="$iso_path",media=cdrom,readonly=on \
-        -virtfs local,path="$(pwd)",mount_tag=host,security_model=passthrough,id=host \
         -netdev user,id=net0,hostfwd=tcp::2222-:22 \
         -device virtio-net-pci,netdev=net0 \
         -monitor unix:$vm_dir/monitor.sock,server,nowait \
