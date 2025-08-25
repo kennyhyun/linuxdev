@@ -81,8 +81,19 @@ create_qemu_vm() {
     # for Automated Install
     # Preseed 파일 생성 (완전 자동 설치)
     # HTTP 포트와 사용자명을 preseed에 삽입하기 위해 임시 변수 사용
-    local preseed_late_cmd="wget -O /tmp/id_rsa.pub http://10.0.2.2:$http_port/key/id_rsa.pub && mkdir -p /target/home/$username/.ssh /target/root/.ssh && cp /tmp/id_rsa.pub /target/home/$username/.ssh/authorized_keys && cp /tmp/id_rsa.pub /target/root/.ssh/authorized_keys && chown 1000:1000 /target/home/$username/.ssh/authorized_keys && chmod 600 /target/home/$username/.ssh/authorized_keys && chmod 700 /target/home/$username/.ssh && chmod 600 /target/root/.ssh/authorized_keys && chmod 700 /target/root/.ssh && echo '$username ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/98_$username && chmod 440 /target/etc/sudoers.d/98_$username"
-    
+    local preseed_late_cmd="wget -O /tmp/id_rsa.pub http://10.0.2.2:$http_port/key/id_rsa.pub && \
+        mkdir -p /target/home/$username/.ssh /target/root/.ssh && \
+        chmod 700 /target/home/$username/.ssh && \
+        chmod 700 /target/root/.ssh && \
+        cp /tmp/id_rsa.pub /target/home/$username/.ssh/authorized_keys && \
+        chmod 600 /target/home/$username/.ssh/authorized_keys && \
+        chown 1000:1000 -R /target/home/$username/.ssh && \
+        cp /tmp/id_rsa.pub /target/root/.ssh/authorized_keys && \
+        chmod 600 /target/root/.ssh/authorized_keys && \
+        echo '$username ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/98_$username && \
+        chmod 440 /target/etc/sudoers.d/98_$username && \
+        sed -i 's/^#\?PermitRootLogin prohibit-password/PermitRootLogin yes/' /target/etc/ssh/sshd_config"
+
     cat > "$vm_dir/preseed.cfg" << EOF
 d-i debian-installer/locale string en_AU
 d-i console-setup/ask_detect boolean false
