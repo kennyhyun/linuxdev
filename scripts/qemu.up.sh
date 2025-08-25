@@ -51,9 +51,11 @@ if [ "$1" = "--console" ] || [ "$1" = "-c" ]; then
         -nographic
 else
     echo "Starting VM '$NAME' in headless mode... in '$VM_DIR'"
-    echo "SSH: ssh -p 2222 kenny@localhost"
-    echo "VNC: localhost:5901"
-    echo "Console: ./up.sh --console"
+    if [ "$1" != "-q" ]; then
+        echo "SSH: ssh -p 2222 kenny@localhost"
+        echo "VNC: localhost:5901"
+        echo "Console: ./up.sh --console"
+    fi
     qemu-system-aarch64 \
         -M virt,highmem=on,gic-version=3 \
         -accel hvf \

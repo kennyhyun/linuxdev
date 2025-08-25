@@ -218,43 +218,47 @@ SETUP_EOF
         -vnc 127.0.0.1:1,password=off \
         -nographic
     
+    echo "INSTALL_COMPLETE" >> "$vm_dir/.status"
+    echo "$(date) - Installation completed" >> "$vm_dir/install.log"
+
     # HTTP 서버 종료 및 설치 완료 기록
     kill $http_pid 2>/dev/null || true
     echo "✅ VM installation completed"
   fi
 
     # Start the VM
-    echo "Starting VM..."
-    ./up.sh
+    ./up.sh -q
     
-    # Wait until SSH server is ready on port 2222
-    echo "Waiting for SSH server to be ready..."
-    for i in {1..60}; do
-        if nc -z localhost 2222 2>/dev/null; then
-            echo "✅ SSH server is ready on port 2222"
+    # Wait until SSH authentication is ready
+    echo "Waiting for SSH authentication to be ready..."
+    for i in {1..10}; do
+        if timeout 3 ssh -p 2222 -i "$vm_dir/key/id_rsa" -o StrictHostKeyChecking=no -o ConnectTimeout=3 "$username@localhost" "echo ''" 2>/dev/null; then
+            echo "✅ SSH authentication is ready"
             break
         fi
-        if [ $i -eq 60 ]; then
-            echo "❌ Timeout waiting for SSH server"
+        if [ $i -eq 10 ]; then
+            echo "❌ Timeout waiting for SSH authentication"
             return 1
         fi
-        sleep 2
+        echo "Attempt $i/10: SSH not ready yet, waiting..."
+        sleep 3
     done
-    
-    # 설치 완료 상태 기록
-    echo "INSTALL_COMPLETE" >> "$vm_dir/.status"
-    
-    echo "$(date) - Installation completed" >> "$vm_dir/install.log"
-    echo "Installation completed for $vm_name" >> "$vm_dir/install.log"
+        
+    echo "SSHD_STARTED" >> "$vm_dir/.status"
+    echo "Installation completed for $vm_name, up and running" >> "$vm_dir/install.log"
     
     # VM 설정 완료
-
     
-    echo "VM created at: $vm_dir"
-    echo "Installation started. User: $username, Password: debian"
-    echo "SSH will be available at: ssh -p 2222 $username@localhost"
-    echo "Use './up.sh' to start VM after installation"
-    echo "Use './halt.sh' to stop VM"
+    echo "✅ VM setup completed successfully!"
+    echo "🔑 SSH Key Authentication: ssh -p 2222 -i ./vm/key/id_rsa $username@localhost"
+    echo "🔑 Root Access: ssh -p 2222 -i ./vm/key/id_rsa root@localhost"
+    echo "📝 Password Login (fallback): ssh -p 2222 $username@localhost (password: debian)"
+    echo ""
+    echo "🚀 Next steps:"
+    echo "   - VM is already running and ready to use"
+    echo "   - Continue with: ./bootstrap.sh"
+    echo "   - Stop VM: ./halt.sh"
+    echo "   - Check status: ./status.sh"
     
     return 0
 }
