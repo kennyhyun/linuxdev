@@ -269,6 +269,7 @@ usermod -aG sudo $username
 echo "$username ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/98_$username
 chmod 440 /etc/sudoers.d/98_$username
 usermod -aG docker $username
+usermod -aG microk8s $username
 
 if [[ "\$(hostname)" =~ ^debian-[0-9]+$ ]]; then
   echo found default hostname, changing it to $machine_name
