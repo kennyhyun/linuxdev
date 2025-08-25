@@ -2,6 +2,23 @@
 
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
+show_completion_message() {
+  echo "----------------------
+
+Congrats!!!
+
+You can now ssh into the machine by
+\`\`\`
+ssh $machine_name
+\`\`\`
+
+- \`./status.sh\` to check the VM status
+- \`./halt.sh\` to shut down the VM
+- \`./up.sh\` to turn on the VM
+- \`./destory.sh\` to start from scratch
+"
+}
+
 noStartupScript=$(echo ${@} | grep -w '\-\-noStartupScript' >> /dev/null && echo 1 || echo "")
 echo "bootstrap.sh:" $@
 
@@ -19,6 +36,9 @@ echo Bootstrap virtual machine
 echo =================================
 
 source ./.env
+
+expand_disk_size=${EXPAND_DISK_GB:-}
+swapfile=${SWAPFILE:-}
 
 # get username from env or prompt
 username=$VM_USERNAME
@@ -69,21 +89,24 @@ source ./.env
 echo =================================
 echo Welcome $username! Please wait a moment for bootstrapping $machine_name
 
+is_installed=$(grep INSTALL_COMPLETE ./vm/.status)
+
+if [ -n "$is_installed" ]; then
+  echo "The VM is already created" >&2
+else
+
 if [ "$windows" = 1 ]; then
+  echo "INSTALLING" >> ./vm/.status
   vagrant plugin install vagrant-env
-  vagrant up
+  if vagrant up; then
+    echo "INSTALL_COMPLETE" >> ./vm/.status
+  fi
 else
   # VM이 이미 생성되었는지 확인
   if [ -f "./vm/disk.qcow2" ]; then
     if [ -f "./vm/.status" ]; then
       status=$(tail -1 ./vm/.status)
       case "$status" in
-        "COMPLETE")
-          echo "VM '$machine_name' installation completed successfully"
-          echo "To start VM: ./up.sh"
-          echo "To stop VM: ./halt.sh"
-          exit 0
-          ;;
         "INSTALLING")
           echo "VM '$machine_name' installation is in progress..."
           echo "Check status: tail -f ./vm/install.log"
@@ -106,14 +129,12 @@ else
   fi
   
   # Mac - QEMU VM 생성
-  echo "Creating and installing Debian 12 LTS with QEMU..."
-  
+  echo "Creating and installing Debian LTS with QEMU..."
   # QEMU 프로세스 실행 중 확인
   if pgrep -f "qemu-system-aarch64" > /dev/null; then
     echo "QEMU VM is already running. Please stop it first with './halt.sh'"
     exit 1
   fi
-  
   if lsof -i :2222 > /dev/null 2>&1; then
     echo "Port 2222 is already in use. Please stop it manually."
     exit 1
@@ -125,12 +146,9 @@ else
   set -e
   
   echo "\n=== VM Setup Complete ==="
-  echo "VM files created in: ./vm/"
-  echo "To start VM: ./up.sh"
-  echo "To stop VM: ./halt.sh"
-  echo "SSH access: ssh -p 2222 $username@localhost (password: debian)"
-
 fi
+
+fi # if is_installed
 
 # Set platform-specific defaults
 if [ "$windows" = 1 ]; then
@@ -154,7 +172,8 @@ if [ "$windows" = 1 ]; then
   fi
 else
   # Mac/QEMU: Create SSH config manually
-  if [ ! -f "$SSH_CONFIG" ] || [ -z "$(grep $default_user_name $SSH_CONFIG)" ]; then
+  if [ ! -f "$SSH_CONFIG" ] || [ -z "$(grep "User $default_user_name"ca $SSH_CONFIG)" ]; then
+    echo Setting User $default_user_name to $SSH_CONFIG
     cat > "$SSH_CONFIG" << EOF
 Host default
   HostName $ssh_host
@@ -188,7 +207,7 @@ if [ -z "$admin_uid" ]; then
 fi
 
 # Skip SSH key copying for QEMU (already done during installation)
-if [ "$windows" = 1 ]; then
+if [ "$windows" = 1 ]; then # vagrant only
   $ssh sudo cp -a /home/$default_user_name/.ssh /root/
   $ssh sudo chown -R root:root /root/.ssh
 fi
@@ -210,39 +229,14 @@ ip_address=${IP_ADDRESS:-192.168.99.123}
 $ssh "touch ~/.hushlogin"
 
 $ssh << EOSSH
-docker -v && exit;
-
-echo "====> Installing Docker"
-docker_version=\$(grep '^_VER_DOCKER=' ${host_directory}.env |tail -1 |cut -d'=' -f2)
-echo "Version: \$docker_version"
-
-apt-get update
-apt-get install -y ca-certificates curl
-install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
-chmod a+r /etc/apt/keyrings/docker.asc
-
-echo \
-  "deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
-  \$(. /etc/os-release && echo "\$VERSION_CODENAME") stable" | \
-  tee /etc/apt/sources.list.d/docker.list > /dev/null
-apt-get update
-
-apt list -a docker-ce
-
-if [ -z "\$docker_version" ];then
-  apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-else
-  apt_docker_ver=\$(apt list -a docker-ce |grep -m1 \${docker_version} |cut -d' ' -f2)
-  echo    "apt-get install -y docker-ce=\${apt_docker_ver} docker-ce-cli=\${apt_docker_ver} containerd.io docker-buildx-plugin docker-compose-plugin"
-  apt-get install -y docker-ce=\${apt_docker_ver} docker-ce-cli=\${apt_docker_ver} containerd.io docker-buildx-plugin docker-compose-plugin
-fi
-docker -v
-
+[ -d dotfiles ] && rm -rf dotfiles || true && \
+git clone -b alt/linuxdev https://github.com/kennyhyun/dotfiles.git dotfiles && \
+PRODUCTION=1 dotfiles/scripts/linux.sh linuxdev && \
+rm -rf dotfiles
 EOSSH
 
-# Skip user creation for QEMU (already done during installation)
-if [ "$windows" = 1 ] && [ -z "$exists" ]; then
+# switch default user to $username
+if [ "$username" != "$default_user_name" ] && [ -z "$exists" ]; then
   echo "user $username not found"
   $ssh << EOSSH
 echo ---------------------
@@ -264,6 +258,7 @@ EOSSH
   echo ---------------------
 fi
 
+# initial setup
 vm_hosts_vars=$(set | grep "__VMHOSTS__[^=]\+=" | cut -c 12-)
 $ssh << EOSSH
 echo --------------------- Removing ${default_user_name} password
@@ -282,7 +277,7 @@ if [[ "\$(hostname)" =~ ^debian-[0-9]+$ ]]; then
   echo "127.0.0.1 $machine_name" >> /etc/hosts
 fi
 
-if [ $swapfile ]; then
+if [ -n "$swapfile" ]; then
   echo Found SWAPFILE config
   if ! [ -f "/swapfile" ]; then
     echo "-----
@@ -302,7 +297,7 @@ fi
 swapon --show
 free -h
 
-if ! [ -f "/dummy" ]; then
+if [ -n "$expand_disk_size" ] && ! [ -f "/dummy" ]; then
   echo "-----
 Expanding actual size for ${expand_disk_size}GB"
   let "blockSize = $expand_disk_size * 1024"
@@ -310,6 +305,22 @@ Expanding actual size for ${expand_disk_size}GB"
   echo DDing \$blockSize x 1M
   dd if=/dev/zero of=/dummy bs=1M count=\$blockSize oflag=append conv=notrunc
 fi
+
+# add hosts entry
+echo "$vm_hosts_vars" | while read -r line; do
+  host=\$(echo \$line | cut -d"=" -f 2)
+  ip=\$(echo \$line | cut -d"=" -f 1 | cut -f1,2,3,4 -d'_' | tr _ ".")
+  if [ -z "\$(grep "\$ip \$host" /etc/hosts)" ]; then
+    echo "Adding \"\$ip \$host\" to hosts file"
+    echo "\$ip \$host" >> /etc/hosts
+  fi
+done
+
+EOSSH
+
+
+if [ "$windows" = 1 ]; then # vagrant only
+$ssh << EOSSH
 
 if [ -z "\$(crontab -l|grep "${machine_name}.startup.sh")" ]; then
   echo "-----
@@ -333,17 +344,8 @@ crontab scripts:"
 fi
   crontab -l
 
-# add hosts entry
-echo "$vm_hosts_vars" | while read -r line; do
-  host=\$(echo \$line | cut -d"=" -f 2)
-  ip=\$(echo \$line | cut -d"=" -f 1 | cut -f1,2,3,4 -d'_' | tr _ ".")
-  if [ -z "\$(grep "\$ip \$host" /etc/hosts)" ]; then
-    echo "Adding \"\$ip \$host\" to hosts file"
-    echo "\$ip \$host" >> /etc/hosts
-  fi
-done
-
 EOSSH
+fi
 
 $ssh "rm ~/.hushlogin"
 
@@ -365,6 +367,12 @@ fi
 ssh $machine_name "touch ~/.hushlogin"
 
 #### user $username
+if  [ "$username" == "$default_user_name" ]; then
+  echo "username was the default user, stop personalising."
+  show_completion_message
+  exit
+fi
+
 ssh $machine_name << EOSSH
 
 echo "==============================
@@ -391,29 +399,6 @@ Installing oh my zsh...."
   sh install.sh --unattended && \
   rm -f install.sh* && \
   sudo chsh -s /bin/zsh $username
-fi
-fi
-
-if [ "\$?" -eq 0 ]; then
-if [ -f "/usr/local/bin/docker-compose" ]; then
-  echo "-----
-docker-compose aleady exists"
-  docker-compose --version
-else
-  echo "-----
-Installing docker-compose...."
-  sudo pip3 install requests --upgrade
-  dc_version=\${COMPOSE_VERSION:-1.29.2}
-  dc_version_url=/docker/compose/releases/download/\${dc_version}/docker-compose-\$(uname -s)-\$(uname -m)
-  if [ -z "\$dc_version_url" ];then
-    echo "Could not find the docker-compose url, please install manually from \$github_compose_release_url"
-  else
-    docker_compose_url=https://github.com\${dc_version_url}
-    echo Downloading: \$docker_compose_url
-    sudo wget \$docker_compose_url -O /usr/local/bin/docker-compose -q --show-progress --progress=bar:force
-    sudo chmod +x /usr/local/bin/docker-compose
-    docker-compose --version
-  fi
 fi
 fi
 
@@ -503,7 +488,7 @@ else
   ssh $machine_name << EOSSH
 if ! [ -d ~/dotfiles ]; then
   echo "======= Cloning dotfiles"
-  git clone $([ -n "$DOTFILES_BRANCH" ] && echo "--branch $DOTFILES_BRANCH") --recurse-submodules $DOTFILES_REPO ~/dotfiles && \
+  git clone $([ -n "$DOTFILES_BRANCH" ] && echo "-b $DOTFILES_BRANCH") --recurse-submodules $DOTFILES_REPO ~/dotfiles && \
   init=\$(find dotfiles -maxdepth 1 -type f -executable -name 'init*' \
 -o -type f -executable -name "bootstrap*" -o -type f -executable -name "setup*" \
 -o -type f -executable -name "install*" \
@@ -590,17 +575,4 @@ echo ---------------------
 rm ~/.hushlogin
 EOSSH
 
-echo "----------------------
-
-Congrats!!!
-
-You can now ssh into the machine by
-\`\`\`
-ssh $machine_name
-\`\`\`
-
-- \`./status.sh\` to check the VM status
-- \`./halt.sh\` to shut down the VM
-- \`./up.sh\` to turn on the VM
-- \`./destory.sh\` to start from scratch
-"
+show_completion_message
