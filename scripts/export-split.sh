@@ -159,6 +159,17 @@ create_7zip_volumes() {
     echo "  gh release create v$(date +%Y%m%d) ${archive_name}${archive_ext} ${archive_name}.sha256 \\"
     echo "    --title 'VM Export $(date +%Y-%m-%d)' \\"
     echo "    --notes 'VM disk image${notes_desc_aux}. Extract with: 7z x ${archive_name}.7z${extract_cmd_suffix}'"
+    
+    # 자동 업로드 옵션
+    if [ "$2" = "--upload" ]; then
+        echo ""
+        read -p "Create GitHub Release now? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            echo "Creating GitHub Release..."
+            "$SCRIPT_DIR/upload-release.sh" "${archive_name}"
+        fi
+    fi
 }
 
 # 메인 실행
@@ -201,10 +212,11 @@ main() {
 
 # 사용법 출력
 if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
-    echo "Usage: $0 [VM_NAME] [FORMAT]"
+    echo "Usage: $0 [VM_NAME] [--upload]"
     echo ""
     echo "Arguments:"
     echo "  VM_NAME   VM name (default: linuxdev)"
+    echo "  --upload  Create GitHub Release after export"
     echo ""
     echo "Features:"
     echo "  - Exports VM disk in QCOW2 format"
@@ -215,6 +227,7 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo "Examples:"
     echo "  $0                    # Export as QCOW2, split with 7zip"
     echo "  $0 myvm              # Export specific VM"
+    echo "  $0 myvm --upload     # Export and create GitHub Release"
     echo ""
     echo "After upload, users can:"
     echo "  1. Download all .7z.* files"
