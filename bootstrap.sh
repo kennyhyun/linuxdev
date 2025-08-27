@@ -2,6 +2,23 @@
 
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
+show_completion_message() {
+  echo "----------------------
+
+Congrats!!!
+
+You can now ssh into the machine by
+\`\`\`
+ssh $machine_name
+\`\`\`
+
+- \`./status.sh\` to check the VM status
+- \`./halt.sh\` to shut down the VM
+- \`./up.sh\` to turn on the VM
+- \`./destory.sh\` to start from scratch
+"
+}
+
 noStartupScript=$(echo ${@} | grep -w '\-\-noStartupScript' >> /dev/null && echo 1 || echo "")
 echo "bootstrap.sh:" $@
 
@@ -15,27 +32,21 @@ else
 fi
 
 echo =================================
-echo Bootstrap vagrant machine
+echo Bootstrap virtual machine
 echo =================================
 
 source ./.env
 
-expand_disk_size=${EXPAND_DISK_GB:-4}
+expand_disk_size=${EXPAND_DISK_GB:-}
 swapfile=${SWAPFILE:-}
-COMPOSE_VERSION=${_VER_DOCKER_COMPOSE}
-
-if [ "$_VER_DOCKER" ]; then
-  # setting docker version for provisioning
-  sed -i "s/VERSION=.*/VERSION=$_VER_DOCKER/" $SCRIPT_DIR/config/env_var.sh
-fi
 
 # get username from env or prompt
-username=$VAGRANT_USERNAME
-if [ -z "$VAGRANT_USERNAME" ]; then
-  echo -n "> Please enter default vagrant user name [vagrant]:"
+username=$VM_USERNAME
+if [ -z "$VM_USERNAME" ]; then
+  echo -n "> Please enter default vm user name [linuxdev]:"
   read input
-  username=${input:-vagrant}
-  echo "VAGRANT_USERNAME=$username">> .env
+  username=${input:-linuxdev}
+  echo "VM_USERNAME=$username">> .env
 fi
 
 machine_name=${NAME:-linuxdev}
@@ -67,43 +78,147 @@ if [ -z "$DOTFILES_REPO" ]; then
   fi
 fi
 
-echo =================================
-echo Welcome $username! Pleae wait a moment for bootstrapping $machine_name
+if [ -z "$DISK_SIZE_GB" ]; then
+  echo -n "> Please enter the gigabytes of disk [64]:"
+  read input
+  echo "DISK_SIZE_GB=${input:-64}">> .env
+fi
 
-vagrant plugin install vagrant-env
-vagrant up
+source ./.env
+
+echo =================================
+echo Welcome $username! Please wait a moment for bootstrapping $machine_name
+
+is_installed=$(grep INSTALL_COMPLETE ./vm/.status)
+
+if [ -n "$is_installed" ]; then
+  echo "The VM is already created" >&2
+else
+
+if [ "$windows" = 1 ]; then
+  echo "INSTALLING" >> ./vm/.status
+  vagrant plugin install vagrant-env
+  if vagrant up; then
+    echo "INSTALL_COMPLETE" >> ./vm/.status
+  fi
+else
+  # VM이 이미 생성되었는지 확인
+  if [ -f "./vm/disk.qcow2" ]; then
+    if [ -f "./vm/.status" ]; then
+      status=$(tail -1 ./vm/.status)
+      case "$status" in
+        "INSTALLING")
+          echo "VM '$machine_name' installation is in progress..."
+          echo "Check status: tail -f ./vm/install.log"
+          echo "To restart installation: rm -rf ./vm/ && ./bootstrap.sh"
+          exit 0
+          ;;
+        "FAILED"|"TIMEOUT")
+          echo "VM '$machine_name' installation failed or timed out"
+          echo "Removing failed installation..."
+          rm -rf ./vm/
+          echo "Retrying installation..."
+          ;;
+      esac
+    else
+      echo "VM '$machine_name' exists but status unknown"
+      echo "To start VM: ./up.sh"
+      echo "To recreate VM: rm -rf ./vm/ && ./bootstrap.sh"
+      exit 0
+    fi
+  fi
+  
+  # Mac - QEMU VM 생성
+  echo "Creating and installing Debian LTS with QEMU..."
+  # QEMU 프로세스 실행 중 확인
+  if pgrep -f "qemu-system-aarch64" > /dev/null; then
+    echo "QEMU VM is already running. Please stop it first with './halt.sh'"
+    exit 1
+  fi
+  if lsof -i :2222 > /dev/null 2>&1; then
+    echo "Port 2222 is already in use. Please stop it manually."
+    exit 1
+  fi
+  
+  # VM 생성 및 설치
+  set +e
+  ./scripts/qemu.create.sh "$machine_name" "${MEMORY:-2048}" "${CPUS:-2}" "${DISK_SIZE_GB:-20}" "$username"
+  set -e
+  
+  echo "\n=== VM Setup Complete ==="
+fi
+
+fi # if is_installed
+
+# Set platform-specific defaults
+if [ "$windows" = 1 ]; then
+  # Windows/Vagrant defaults
+  default_user_name="vagrant"
+  host_directory="/vagrant/"
+else
+  # Mac/QEMU defaults
+  default_user_name="linuxdev"
+  host_directory="/mnt/host/"
+  ssh_port="2222"
+  ssh_host="localhost"
+fi
 
 # create ssh config file
 SSH_CONFIG="$SCRIPT_DIR/ssh.config"
-if [ -z "$(grep vagrant $SSH_CONFIG)" ]; then
-  vagrant ssh-config >> $SSH_CONFIG
+if [ "$windows" = 1 ]; then
+  # Windows/Vagrant: Use vagrant ssh-config
+  if [ -z "$(grep $default_user_name $SSH_CONFIG)" ]; then
+    vagrant ssh-config >> $SSH_CONFIG
+  fi
+else
+  # Mac/QEMU: Create SSH config manually
+  if [ ! -f "$SSH_CONFIG" ] || [ -z "$(grep "User $default_user_name"ca $SSH_CONFIG)" ]; then
+    echo Setting User $default_user_name to $SSH_CONFIG
+    cat > "$SSH_CONFIG" << EOF
+Host default
+  HostName $ssh_host
+  User $default_user_name
+  Port $ssh_port
+  UserKnownHostsFile /dev/null
+  StrictHostKeyChecking no
+  PasswordAuthentication no
+  IdentityFile $(pwd)/vm/key/id_rsa
+  IdentitiesOnly yes
+  LogLevel FATAL
+EOF
+  fi
 fi
 
 # create user with UID 1000
 
-#### user vagrant
+#### switch default user
 ssh="ssh -F $SSH_CONFIG default"
 exists=$($ssh id -u $username 2>/dev/null)
-vagrant_uid=$($ssh id -u vagrant 2>/dev/null)
+admin_uid=$($ssh id -u $default_user_name 2>/dev/null)
 
 set -e
 
-if [ "$vagrant_uid" == "1000" ] && ([ "$exists" != "" ] && [ "$exists" != "1000" ]); then
+if [ "$admin_uid" == "1000" ] && ([ "$exists" != "" ] && [ "$exists" != "1000" ]); then
   echo switching is required, remove $username and try again
 fi
-if [ -z "$vagrant_uid" ]; then
+if [ -z "$admin_uid" ]; then
   echo ssh connection looks like failed
   exit -1;
 fi
-$ssh sudo cp -a /home/vagrant/.ssh /root/
-$ssh sudo chown -R root:root /root/.ssh
+
+# Skip SSH key copying for QEMU (already done during installation)
+if [ "$windows" = 1 ]; then # vagrant only
+  $ssh sudo cp -a /home/$default_user_name/.ssh /root/
+  $ssh sudo chown -R root:root /root/.ssh
+fi
+
 
 if [ -z "$(grep root $SSH_CONFIG.user)" ]; then
-$sed -e '0,/vagrant/{s/vagrant/'$username'/}' -e '0,/default/{s/default/'$machine_name/'}' $SSH_CONFIG >> $SSH_CONFIG.user
+$sed -e "0,/$default_user_name/{s/$default_user_name/$username/}" -e '0,/default/{s/default/'$machine_name'/}' $SSH_CONFIG >> $SSH_CONFIG.user
 fi
 
 if [ -z "$(grep root $SSH_CONFIG.root)" ]; then
-  $sed -e '0,/vagrant/{s/vagrant/root/}' -e '0,/default/{s/default/root/}' $SSH_CONFIG >> $SSH_CONFIG.root
+  $sed -e "0,/$default_user_name/{s/$default_user_name/root/}" -e '0,/default/{s/default/root/}' $SSH_CONFIG >> $SSH_CONFIG.root
 fi
 
 #### user root
@@ -114,52 +229,28 @@ ip_address=${IP_ADDRESS:-192.168.99.123}
 $ssh "touch ~/.hushlogin"
 
 $ssh << EOSSH
-docker -v && exit;
-
-echo "====> Installing Docker"
-docker_version=\$(grep '^_VER_DOCKER=' /vagrant/.env |tail -1 |cut -d'=' -f2)
-echo "Version: \$docker_version"
-
-apt-get update
-apt-get install -y ca-certificates curl
-install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
-chmod a+r /etc/apt/keyrings/docker.asc
-
-echo \
-  "deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
-  \$(. /etc/os-release && echo "\$VERSION_CODENAME") stable" | \
-  tee /etc/apt/sources.list.d/docker.list > /dev/null
-apt-get update
-
-apt list -a docker-ce
-
-if [ -z "\$docker_version" ];then
-  apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-else
-  apt_docker_ver=\$(apt list -a docker-ce |grep -m1 \${docker_version} |cut -d' ' -f2)
-  echo    "apt-get install -y docker-ce=\${apt_docker_ver} docker-ce-cli=\${apt_docker_ver} containerd.io docker-buildx-plugin docker-compose-plugin"
-  apt-get install -y docker-ce=\${apt_docker_ver} docker-ce-cli=\${apt_docker_ver} containerd.io docker-buildx-plugin docker-compose-plugin
-fi
-docker -v
-
+[ -d dotfiles ] && rm -rf dotfiles || true && \
+git clone -b alt/linuxdev https://github.com/kennyhyun/dotfiles.git dotfiles && \
+PRODUCTION=1 dotfiles/scripts/linux.sh linuxdev && \
+rm -rf dotfiles
 EOSSH
 
-if [ -z "$exists" ]; then
+# switch default user to $username
+if [ "$username" != "$default_user_name" ] && [ -z "$exists" ]; then
   echo "user $username not found"
   $ssh << EOSSH
 echo ---------------------
 echo "creating $username"
-vagrant_uid=\$(id -u vagrant)
-if [ \$vagrant_uid == 1000 ]; then
+admin_uid=\$(id -u ${default_user_name})
+if [ \$admin_uid == 1000 ]; then
   pkill -U 1000
-  usermod -u 1002 vagrant
-  groupmod -g 1002 vagrant
+  usermod -u 1002 ${default_user_name}
+  groupmod -g 1002 ${default_user_name}
 fi
-chown -R vagrant:vagrant /home/vagrant
+chown -R ${default_user_name}:${default_user_name} /home/${default_user_name}
 useradd $username -u 1000 --create-home
 if ! [ -d "/home/$username/.ssh" ]; then
-  cp -a /home/vagrant/.ssh /home/$username/
+  cp -a /home/${default_user_name}/.ssh /home/$username/
   chown -R $username:$username /home/$username/.ssh
 fi
 grep $username /etc/passwd
@@ -167,16 +258,18 @@ EOSSH
   echo ---------------------
 fi
 
+# initial setup
 vm_hosts_vars=$(set | grep "__VMHOSTS__[^=]\+=" | cut -c 12-)
 $ssh << EOSSH
-echo --------------------- Removing vagrant password
-passwd vagrant --delete > /dev/null
+echo --------------------- Removing ${default_user_name} password
+passwd ${default_user_name} --delete > /dev/null
 echo ---------------------
 echo Adding $username to Sudoer 
 usermod -aG sudo $username
 echo "$username ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/98_$username
 chmod 440 /etc/sudoers.d/98_$username
 usermod -aG docker $username
+usermod -aG microk8s $username
 
 if [[ "\$(hostname)" =~ ^debian-[0-9]+$ ]]; then
   echo found default hostname, changing it to $machine_name
@@ -185,7 +278,7 @@ if [[ "\$(hostname)" =~ ^debian-[0-9]+$ ]]; then
   echo "127.0.0.1 $machine_name" >> /etc/hosts
 fi
 
-if [ $swapfile ]; then
+if [ -n "$swapfile" ]; then
   echo Found SWAPFILE config
   if ! [ -f "/swapfile" ]; then
     echo "-----
@@ -205,7 +298,7 @@ fi
 swapon --show
 free -h
 
-if ! [ -f "/dummy" ]; then
+if [ -n "$expand_disk_size" ] && ! [ -f "/dummy" ]; then
   echo "-----
 Expanding actual size for ${expand_disk_size}GB"
   let "blockSize = $expand_disk_size * 1024"
@@ -214,10 +307,26 @@ Expanding actual size for ${expand_disk_size}GB"
   dd if=/dev/zero of=/dummy bs=1M count=\$blockSize oflag=append conv=notrunc
 fi
 
+# add hosts entry
+echo "$vm_hosts_vars" | while read -r line; do
+  host=\$(echo \$line | cut -d"=" -f 2)
+  ip=\$(echo \$line | cut -d"=" -f 1 | cut -f1,2,3,4 -d'_' | tr _ ".")
+  if [ -z "\$(grep "\$ip \$host" /etc/hosts)" ]; then
+    echo "Adding \"\$ip \$host\" to hosts file"
+    echo "\$ip \$host" >> /etc/hosts
+  fi
+done
+
+EOSSH
+
+
+if [ "$windows" = 1 ]; then # vagrant only
+$ssh << EOSSH
+
 if [ -z "\$(crontab -l|grep "${machine_name}.startup.sh")" ]; then
   echo "-----
 Adding startup script to crontab"
-  cp /vagrant/config/vm.docker.disk.sh /root/docker.disk.sh && \
+  cp ${host_directory}config/vm.docker.disk.sh /root/docker.disk.sh && \
   chmod +x /root/docker.disk.sh && \
   echo "#!/bin/sh
 /root/docker.disk.sh" > /root/${machine_name}.startup.sh && \
@@ -236,17 +345,8 @@ crontab scripts:"
 fi
   crontab -l
 
-# add hosts entry
-echo "$vm_hosts_vars" | while read -r line; do
-  host=\$(echo \$line | cut -d"=" -f 2)
-  ip=\$(echo \$line | cut -d"=" -f 1 | cut -f1,2,3,4 -d'_' | tr _ ".")
-  if [ -z "\$(grep "\$ip \$host" /etc/hosts)" ]; then
-    echo "Adding \"\$ip \$host\" to hosts file"
-    echo "\$ip \$host" >> /etc/hosts
-  fi
-done
-
 EOSSH
+fi
 
 $ssh "rm ~/.hushlogin"
 
@@ -268,6 +368,12 @@ fi
 ssh $machine_name "touch ~/.hushlogin"
 
 #### user $username
+if  [ "$username" == "$default_user_name" ]; then
+  echo "username was the default user, stop personalising."
+  show_completion_message
+  exit
+fi
+
 ssh $machine_name << EOSSH
 
 echo "==============================
@@ -298,29 +404,6 @@ fi
 fi
 
 if [ "\$?" -eq 0 ]; then
-if [ -f "/usr/local/bin/docker-compose" ]; then
-  echo "-----
-docker-compose aleady exists"
-  docker-compose --version
-else
-  echo "-----
-Installing docker-compose...."
-  sudo pip3 install requests --upgrade
-  dc_version=\${COMPOSE_VERSION:-1.29.2}
-  dc_version_url=/docker/compose/releases/download/\${dc_version}/docker-compose-\$(uname -s)-\$(uname -m)
-  if [ -z "\$dc_version_url" ];then
-    echo "Could not find the docker-compose url, please install manually from \$github_compose_release_url"
-  else
-    docker_compose_url=https://github.com\${dc_version_url}
-    echo Downloading: \$docker_compose_url
-    sudo wget \$docker_compose_url -O /usr/local/bin/docker-compose -q --show-progress --progress=bar:force
-    sudo chmod +x /usr/local/bin/docker-compose
-    docker-compose --version
-  fi
-fi
-fi
-
-if [ "\$?" -eq 0 ]; then
 mkdir -p ~/Projects
 if [ -d ~/samba ]; then
   echo "-----
@@ -329,7 +412,7 @@ else
   echo "-----
 Configuring samba"
   mkdir -p samba
-  cp /vagrant/config/samba/* samba/
+  cp ${host_directory}config/samba/* samba/
   cd samba
   docker-compose down
   docker-compose up -d
@@ -357,10 +440,10 @@ if [ -d ~/.docker/certs.$machine_name ]; then
 else
   echo "--------
 Creating Docker certs"
-  ssh $machine_name /vagrant/scripts/create_docker_certs.sh
+  ssh $machine_name ${host_directory}scripts/create_docker_certs.sh
   mkdir -p ~/.docker/certs.$machine_name
   cp $SCRIPT_DIR/certs/*.pem ~/.docker/certs.$machine_name/
-  ssh $machine_name sudo /vagrant/scripts/config_docker_certs.sh
+  ssh $machine_name sudo ${host_directory}scripts/config_docker_certs.sh
   echo "export DOCKER_CERT_PATH=~/.docker/certs.$machine_name
 export DOCKER_HOST=tcp://$ip_address:$docker_port
 export DOCKER_TLS_VERIFY=1
@@ -377,10 +460,10 @@ mkdir -p $SCRIPT_DIR/data/fonts
 touch $SCRIPT_DIR/data/fonts/.download_start_file
 if [ "$FONT_URLS" ] || [ "$PATCHED_FONT_URLS" ]; then
 echo "Installing fonts"
-ssh $machine_name "bash /vagrant/scripts/download-fonts.sh \"$FONT_URLS\" \"$PATCHED_FONT_URLS\""
+ssh $machine_name "bash ${host_directory}scripts/download-fonts.sh \"$FONT_URLS\" \"$PATCHED_FONT_URLS\""
 downloaded=$(find $SCRIPT_DIR/data/fonts -maxdepth 1 -newer $SCRIPT_DIR/data/fonts/.download_start_file -type f -name "*.ttf")
 if [ "$downloaded" ]; then
-  if [ "$windows" ]; then
+  if [ "$windows" = 1 ]; then
     while read file; do
       base=$(basename "$file")
       font_args="$font_args \"$base\""
@@ -406,7 +489,7 @@ else
   ssh $machine_name << EOSSH
 if ! [ -d ~/dotfiles ]; then
   echo "======= Cloning dotfiles"
-  git clone $([ -n "$DOTFILES_BRANCH" ] && echo "--branch $DOTFILES_BRANCH") --recurse-submodules $DOTFILES_REPO ~/dotfiles && \
+  git clone $([ -n "$DOTFILES_BRANCH" ] && echo "-b $DOTFILES_BRANCH") --recurse-submodules $DOTFILES_REPO ~/dotfiles && \
   init=\$(find dotfiles -maxdepth 1 -type f -executable -name 'init*' \
 -o -type f -executable -name "bootstrap*" -o -type f -executable -name "setup*" \
 -o -type f -executable -name "install*" \
@@ -426,7 +509,7 @@ EOSSH
 fi
 
 echo "Setting up host environments"
-if [ -z "$windows" ]; then
+if [ "$windows" -ne 1 ]; then
   if [ -z "$noStartupScript" ]; then
     $SCRIPT_DIR/scripts/setup-launchd.sh
   fi
@@ -493,16 +576,4 @@ echo ---------------------
 rm ~/.hushlogin
 EOSSH
 
-echo "----------------------
-
-Congrats!!!
-
-You can now ssh into the machine by
-\`\`\`
-ssh $machine_name
-\`\`\`
-
-- \`vagrant halt\` to shut down the VM
-- \`vagrant up\` to turn on the VM
-- \`./destory.sh\` to start from scratch
-"
+show_completion_message

@@ -60,3 +60,10 @@ ssh.config*
 backup
 *~
 *.vdi
+
+# qemu vm dir
+/vm
+/exports
+
+*.bak
+
