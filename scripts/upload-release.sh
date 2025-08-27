@@ -69,4 +69,4 @@ gh release create "$TAG" $ARCHIVE_FILES "${ARCHIVE_NAME}.sha256" \
     --notes "$NOTES"
 
 echo "✅ GitHub Release created successfully!"
-echo "🔗 View at: https://github.com/$(gh repo view --json owner,name -q '.owner.login + "/" + .name')/releases/tag/$TAG"
+echo "🔗 View release at: gh release view $TAG --web"
