@@ -12,6 +12,32 @@ OUTPUT_DIR="$PROJECT_DIR/exports"
 VOLUME_SIZE="2000m"  # 2GB보다 약간 작게 (안전 마진)
 
 # 함수들
+get_vm_architecture() {
+    local vm_disk="$PROJECT_DIR/vm/disk.qcow2"
+    if [ -f "$vm_disk" ]; then
+        # qemu-img info로 아키텍처 정보 추출 시도
+        local arch_info=$(qemu-img info "$vm_disk" 2>/dev/null | grep -i "format specific" -A 10 || true)
+        
+        # 프로세서 아키텍처 감지
+        local host_arch=$(uname -m)
+        case "$host_arch" in
+            "arm64"|"aarch64") echo "arm64" ;;
+            "x86_64"|"amd64") echo "x64" ;;
+            "i386"|"i686") echo "x86" ;;
+            *) echo "$host_arch" ;;
+        esac
+    else
+        # VM 디스크가 없으면 호스트 아키텍처 사용
+        local host_arch=$(uname -m)
+        case "$host_arch" in
+            "arm64"|"aarch64") echo "arm64" ;;
+            "x86_64"|"amd64") echo "x64" ;;
+            "i386"|"i686") echo "x86" ;;
+            *) echo "$host_arch" ;;
+        esac
+    fi
+}
+
 check_vm_status() {
     echo "Checking VM status..."
     if pgrep -f "qemu-system-aarch64" > /dev/null; then
@@ -37,7 +63,8 @@ check_vm_status() {
 
 export_qcow2_uncompressed() {
     local input_file="$PROJECT_DIR/vm/disk.qcow2"
-    local output_file="$OUTPUT_DIR/${VM_NAME}-$(date +%Y%m%d).qcow2"
+    local arch=$(get_vm_architecture)
+    local output_file="$OUTPUT_DIR/${VM_NAME}-${arch}-$(date +%Y%m%d).qcow2"
     
     echo "Exporting QCOW2 format (uncompressed)..."
     qemu-img convert -f qcow2 -O qcow2 "$input_file" "$output_file"
@@ -156,7 +183,8 @@ main() {
     
     # QCOW2 export
     export_qcow2_uncompressed
-    local exported_file="$OUTPUT_DIR/${VM_NAME}-$(date +%Y%m%d).qcow2"
+    local arch=$(get_vm_architecture)
+    local exported_file="$OUTPUT_DIR/${VM_NAME}-${arch}-$(date +%Y%m%d).qcow2"
     
     # 파일 정보 출력
     echo ""
