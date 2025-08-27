@@ -63,5 +63,7 @@ backup
 
 # qemu vm dir
 /vm
+/exports
 
 *.bak
+
