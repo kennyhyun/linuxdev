@@ -9,7 +9,7 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 VM_NAME="${1:-linuxdev}"
 EXPORT_FORMAT="qcow2"  # qcow2만 지원
 OUTPUT_DIR="$PROJECT_DIR/exports"
-VOLUME_SIZE="2000m"  # 2GB보다 약간 작게 (안전 마진)
+VOLUME_SIZE="268435456"  # 256MB 정확히 (바이트 단위)
 
 # 함수들
 get_vm_architecture() {
@@ -90,7 +90,7 @@ create_7zip_volumes() {
         fi
     fi
     
-    # 7zip으로 볼륨 분할 압축 (최대 압축률)
+    # 7zip으로 볼륨 분할 압축 (최대 압축률, 무조건 001 확장자)
     cd "$dir"
     local archive_name="${base_name}"
     # 포맷에 따라 다른 아카이브 이름 사용
@@ -99,18 +99,12 @@ create_7zip_volumes() {
     elif [[ "$filename" == *.qcow2 ]]; then
         archive_name="${base_name}"
     fi
-    7z a -t7z -v${VOLUME_SIZE} -mx=9 "${archive_name}.7z" "$filename"
+    7z a -t7z -v${VOLUME_SIZE}b -mx=9 "${archive_name}.7z" "$filename"
     
-    # 압축 파일 검증 및 단일 볼륨 처리
+    # 압축 파일 검증 (무조건 001 파일로 검증)
     echo "Verifying compressed archive..."
     if 7z t "${archive_name}.7z.001" > /dev/null 2>&1; then
         echo "✅ Archive verification successful"
-        
-        # 단일 볼륨인 경우 .001 제거
-        if [ ! -f "${archive_name}.7z.002" ]; then
-            mv "${archive_name}.7z.001" "${archive_name}.7z"
-            echo "✅ Renamed single volume to ${archive_name}.7z"
-        fi
         
         # 검증 성공 시 원본 파일 자동 삭제
         rm "$file_path"
@@ -122,31 +116,20 @@ create_7zip_volumes() {
     
 
     
-    # 체크섬 파일 생성
+    # 체크섬 파일 생성 (무조건 001부터 시작하는 볼륨들)
     echo "Creating checksums..."
-    if [ -f "${archive_name}.7z" ]; then
-        # 단일 볼륨
-        shasum -a 256 "${archive_name}.7z" > "${archive_name}.sha256"
-    else
-        # 다중 볼륨
-        for vol_file in ${archive_name}.7z.*; do
-            if [ -f "$vol_file" ]; then
-                shasum -a 256 "$vol_file" >> "${archive_name}.sha256"
-            fi
-        done
-    fi
+    for vol_file in ${archive_name}.7z.*; do
+        if [ -f "$vol_file" ]; then
+            shasum -a 256 "$vol_file" >> "${archive_name}.sha256"
+        fi
+    done
     
     echo "✅ 7zip archive created:"
     
-    # 단일/다중 볼륨에 따른 변수 설정
-    local archive_ext=".7z"
-    local extract_cmd_suffix=""
-    local notes_desc_aux=""
-    if [ -f "${archive_name}.7z.001" ]; then
-        local archive_ext=".7z.001"
-        local extract_cmd_suffix=".*"
-        local notes_desc_aux="split into 2GB volumes."
-    fi
+    # 무조건 001부터 시작하는 볼륨 설정
+    local archive_ext=".7z.001"
+    local extract_cmd_suffix=".*"
+    local notes_desc_aux="split into 256MB volumes."
     
     ls -lh ${archive_name}${archive_ext}
     echo ""
@@ -220,7 +203,7 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo ""
     echo "Features:"
     echo "  - Exports VM disk in QCOW2 format"
-    echo "  - Splits into 2GB 7zip volumes for GitHub Release"
+    echo "  - Splits into 256MB 7zip volumes for GitHub Release"
     echo "  - Creates checksums for verification"
     echo "  - Compatible with all virtualization platforms"
     echo ""

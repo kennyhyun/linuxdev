@@ -42,7 +42,7 @@ if [ -f "${ARCHIVE_NAME}.7z" ]; then
 elif [ -f "${ARCHIVE_NAME}.7z.001" ]; then
     ARCHIVE_FILES="${ARCHIVE_NAME}.7z.*"
     EXTRACT_CMD="7z x ${ARCHIVE_NAME}.7z.001"
-    NOTES="VM disk image split into 2GB volumes. Extract with: $EXTRACT_CMD"
+    NOTES="VM disk image split into 256MB volumes. Extract with: $EXTRACT_CMD"
 else
     echo "❌ Archive file not found: ${ARCHIVE_NAME}.7z or ${ARCHIVE_NAME}.7z.001"
     exit 1
