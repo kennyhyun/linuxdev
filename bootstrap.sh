@@ -25,6 +25,7 @@ echo "bootstrap.sh:" $@
 set +e
 
 sed="sed"
+windows=0
 if [ $(uname -s) == "Darwin" ]; then
   sed="gsed"
 else
@@ -158,7 +159,7 @@ if [ "$windows" = 1 ]; then
 else
   # Mac/QEMU defaults
   default_user_name="linuxdev"
-  host_directory="/mnt/host/"
+  host_directory="/home/$username/workspace/"
   ssh_port="2222"
   ssh_host="localhost"
 fi
@@ -235,6 +236,48 @@ PRODUCTION=1 dotfiles/scripts/linux.sh linuxdev && \
 rm -rf dotfiles
 EOSSH
 
+
+if [ "$windows" != 1 ]; then
+  # virtfs 자동 마운트를 fstab에 추가 (읽기전용)
+  $ssh << 'EOSSH'
+if ! grep -q "/mnt/host" /etc/fstab; then
+  echo "Adding virtfs mount to fstab (read-only)"
+  mkdir -p /mnt/host
+  echo "host /mnt/host 9p trans=virtio,version=9p2000.L,ro,cache=loose,msize=262144,_netdev 0 0" >> /etc/fstab
+  mount -a
+else
+  echo "virtfs mount already exists in fstab"
+fi
+
+# OverlayFS 설정
+echo "Setting up OverlayFS workspace..."
+LOWER_DIR="/mnt/host"
+UPPER_DIR="/tmp/overlay-upper"
+WORK_DIR="/tmp/overlay-work"
+MERGED_DIR="/home/$username/workspace"
+
+# 디렉토리 생성
+mkdir -p "\$UPPER_DIR" "\$WORK_DIR" "\$MERGED_DIR"
+
+# 기존 마운트 해제
+umount "\$MERGED_DIR" 2>/dev/null || true
+
+# OverlayFS 마운트
+mount -t overlay overlay \
+    -o lowerdir="\$LOWER_DIR",upperdir="\$UPPER_DIR",workdir="\$WORK_DIR" \
+    "\$MERGED_DIR"
+
+# 소유권 변경
+chown -R $username:$username "\$MERGED_DIR" 2>/dev/null || true
+
+echo "OverlayFS workspace ready at: \$MERGED_DIR"
+echo "- Read from host: \$LOWER_DIR (read-only)"
+echo "- Write to: \$UPPER_DIR (temporary)"
+echo "- Merged view: \$MERGED_DIR (read-write)"
+EOSSH
+
+fi
+
 # switch default user to $username
 if [ "$username" != "$default_user_name" ] && [ -z "$exists" ]; then
   echo "user $username not found"
@@ -243,7 +286,12 @@ echo ---------------------
 echo "creating $username"
 admin_uid=\$(id -u ${default_user_name})
 if [ \$admin_uid == 1000 ]; then
+  sleep 1
+  ps -U ${default_user_name}
+  sleep 1
   pkill -U 1000
+  sleep 1
+  ps -U ${default_user_name}
   usermod -u 1002 ${default_user_name}
   groupmod -g 1002 ${default_user_name}
 fi
@@ -396,6 +444,7 @@ oh my zsh is aleady installed"
 else
   echo "-----
 Installing oh my zsh...."
+  touch .zshrc
   wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh
   sh install.sh --unattended && \
   rm -f install.sh* && \
@@ -434,7 +483,7 @@ EOSSH
 
 echo "Creating Docker Certs"
 
-if [ -d ~/.docker/certs.$machine_name ]; then
+if [ -d ~/.docker/certs.$machine_name ] && [ "$(ls -A ~/.docker/certs.$machine_name 2>/dev/null)" ]; then
   echo "--------
 ~/.docker/certs.$machine_name already exists, skip creating Docker certs"
 else
@@ -442,7 +491,15 @@ else
 Creating Docker certs"
   ssh $machine_name ${host_directory}scripts/create_docker_certs.sh
   mkdir -p ~/.docker/certs.$machine_name
-  cp $SCRIPT_DIR/certs/*.pem ~/.docker/certs.$machine_name/
+  if [ "$windows" = 1 ]; then
+    cp $SCRIPT_DIR/certs/*.pem ~/.docker/certs.$machine_name/
+  else
+    # QEMU 환경에서는 scp 사용
+    scp $machine_name:workspace/certs/*.pem ~/.docker/certs.$machine_name/
+    # 호스트 certs 폴더와 동기화
+    mkdir -p $SCRIPT_DIR/certs
+    cp ~/.docker/certs.$machine_name/*.pem $SCRIPT_DIR/certs/
+  fi
   ssh $machine_name sudo ${host_directory}scripts/config_docker_certs.sh
   echo "export DOCKER_CERT_PATH=~/.docker/certs.$machine_name
 export DOCKER_HOST=tcp://$ip_address:$docker_port

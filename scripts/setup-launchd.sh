@@ -7,7 +7,8 @@ if [ $(uname -s) != "Darwin" ]; then
   exit -1
 fi
 
-# replace $HOME in plist and copy to ~/Library/LaunchAgents/
+# LaunchAgents 디렉토리 생성 및 plist 파일 복사
+mkdir -p ~/Library/LaunchAgents
 gsed 's+$HOME+'$HOME'+g' ./config/com.linuxdev.loginscript.plist > ~/Library/LaunchAgents/com.linuxdev.loginscript.plist
 
 # set .startup.linuxdev.sh
