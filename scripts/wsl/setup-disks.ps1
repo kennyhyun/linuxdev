@@ -51,8 +51,9 @@ function Ensure-Vhdx {
     if (Test-Path $Path) {
         Write-Host "  $([System.IO.Path]::GetFileName($Path)) already exists — skipping create"
     } else {
-        Write-Host "  Creating $([System.IO.Path]::GetFileName($Path)) ($($SizeGB)GB dynamic)..."
-        New-VHD -Path $Path -SizeBytes ([long]$SizeGB * 1GB) -Dynamic | Out-Null
+        $sizeBytes = [long]$SizeGB * 1GB
+        Write-Host "  Creating $([System.IO.Path]::GetFileName($Path)) ($SizeGB GB dynamic)..."
+        New-VHD -Path $Path -SizeBytes $sizeBytes -Dynamic | Out-Null
         Write-Host "  Created: $Path"
     }
 }
@@ -178,12 +179,7 @@ Remove-Job $job -ErrorAction SilentlyContinue
 # =============================================
 Write-Host ""
 Write-Host "Verifying mount-disks.sh knows the labels..."
-wsl -d $DistroName -u root -- bash -c "
-    if command -v blkid >/dev/null; then
-        echo 'Disk labels found:'
-        blkid -o list 2>/dev/null | grep linuxdev || echo '  (none yet — reboot may be needed)'
-    fi
-"
+wsl -d $DistroName -u root -- bash -c 'blkid -o list 2>/dev/null | grep linuxdev && echo OK || echo "(none yet)"'
 
 Write-Host ""
 Write-Host "========================================"
