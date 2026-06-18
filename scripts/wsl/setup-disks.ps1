@@ -24,6 +24,22 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Create a VHDX file using diskpart (works without Hyper-V module)
+function New-VhdxWithDiskpart {
+    param([string]$Path, [long]$SizeBytes)
+    $sizeMB = [math]::Ceiling($SizeBytes / 1MB)
+    $script = @"
+create vdisk file="$Path" maximum=$sizeMB type=expandable
+"@
+    $tmpScript = "$env:TEMP\linuxdev-create-vhd.txt"
+    $script | Set-Content $tmpScript -Encoding ASCII
+    $result = diskpart /s $tmpScript 2>&1
+    Remove-Item $tmpScript -Force -ErrorAction SilentlyContinue
+    if (-not (Test-Path $Path)) {
+        Write-Error "diskpart failed to create $Path`n$result"
+    }
+}
+
 # Check admin
 $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -57,7 +73,12 @@ function Ensure-Vhdx {
         $sizeBytes = [long]$SizeGB * 1GB
         $sizeInfo = $SizeGB.ToString() + "GB dynamic"
         Write-Host "  Creating $fileName [$sizeInfo]..."
-        New-VHD -Path $Path -SizeBytes $sizeBytes -Dynamic | Out-Null
+        if (Get-Module -Name Hyper-V -ListAvailable) {
+            Import-Module Hyper-V -ErrorAction SilentlyContinue
+            New-VHD -Path $Path -SizeBytes $sizeBytes -Dynamic | Out-Null
+        } else {
+            New-VhdxWithDiskpart -Path $Path -SizeBytes $sizeBytes
+        }
         Write-Host "  Created: $Path"
     }
 }
