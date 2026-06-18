@@ -106,16 +106,7 @@ function Setup-WslDisk {
     Start-Sleep -Milliseconds 500
 
     # Find the new /dev/sdX device inside WSL (freshly attached = no label yet)
-    $devPath = wsl -d $DistroName -- bash -c @'
-        lsblk -rno NAME,SIZE | while read name size; do
-            dev="/dev/$name"
-            label=$(blkid -o value -s LABEL "$dev" 2>/dev/null || true)
-            if [ -z "$label" ] && [ ! -b "${dev}1" ] && lsblk -no TYPE "$dev" 2>/dev/null | grep -q disk; then
-                echo "$dev"
-                break
-            fi
-        done
-'@ 2>$null
+    $devPath = wsl -d $DistroName -u root -- bash -c 'for dev in /dev/sd*; do [ -b "$dev" ] || continue; label=$(blkid -o value -s LABEL "$dev" 2>/dev/null); [ -z "$label" ] && lsblk -no TYPE "$dev" 2>/dev/null | grep -q disk && echo "$dev" && break; done' 2>$null
 
     if (-not $devPath) {
         # Already formatted - find by label
