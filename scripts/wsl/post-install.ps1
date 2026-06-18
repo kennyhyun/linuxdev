@@ -62,7 +62,17 @@ if (-not $SkipDisks) {
 }
 
 # =============================================
-# Step 4: Mount disks inside WSL
+# Step 4: Format disks (if not already formatted)
+# =============================================
+Write-Host ""
+Write-Host "Formatting unformatted disks (skips already-formatted)..."
+wsl -d $DistroName -u root -- bash "$wslRoot/scripts/wsl/format-disks.sh"
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "WARNING: format-disks.sh returned errors"
+}
+
+# =============================================
+# Step 5: Mount disks inside WSL
 # =============================================
 Write-Host ""
 Write-Host "Mounting disks inside WSL..."
