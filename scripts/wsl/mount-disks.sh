@@ -9,7 +9,9 @@
 #
 # This script finds the attached devices and mounts them to the correct paths.
 
-LOG="/var/run/wsl-boot.log"
+LOG="${WSL_BOOT_LOG:-/var/run/wsl-boot.log}"
+# Ensure log dir exists
+mkdir -p "$(dirname "$LOG")" 2>/dev/null || LOG="/tmp/wsl-boot.log"
 
 mount_vhdx() {
     local label="$1"    # filesystem label (set during mkfs)
