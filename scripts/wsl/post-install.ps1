@@ -51,9 +51,11 @@ Start-Sleep -Seconds 2
 if (-not $SkipDisks) {
     Write-Host ""
     Write-Host "Setting up data disks..."
-    $setupDisksArgs = @("-DistroName", $DistroName, "-DiskDir", $DiskDir)
-    if ($SkipBrew) { $setupDisksArgs += "-SkipBrew" }
-    & "$PSScriptRoot\setup-disks.ps1" @setupDisksArgs
+    if ($SkipBrew) {
+        & "$PSScriptRoot\setup-disks.ps1" -DistroName $DistroName -DiskDir $DiskDir -SkipBrew
+    } else {
+        & "$PSScriptRoot\setup-disks.ps1" -DistroName $DistroName -DiskDir $DiskDir
+    }
     if ($LASTEXITCODE -ne 0) {
         Write-Host "WARNING: setup-disks.ps1 returned errors - check output above"
     }
