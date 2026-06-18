@@ -133,9 +133,10 @@ if [ "$SKIP_PACKAGES" -ne 1 ]; then
         apt-get install -y --no-install-recommends git ca-certificates
     fi
 
-    # Clone to temp dir, run as target user if they exist, else as root
-    TMPDIR_DOTFILES="$(mktemp -d)"
+    # Clone to /var/tmp (exec allowed) instead of /tmp (noexec in WSL2)
+    TMPDIR_DOTFILES="$(mktemp -d -p /var/tmp)"
     git clone -b "$DOTFILES_BRANCH" "$DOTFILES_REPO" "$TMPDIR_DOTFILES/dotfiles"
+    chmod -R +x "$TMPDIR_DOTFILES/dotfiles/scripts/"
 
     if id "$USERNAME" &>/dev/null; then
         # Run as target user so Homebrew installs to their home
