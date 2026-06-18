@@ -1,17 +1,21 @@
 #!/bin/bash
 # WSL2 bootstrap script — idempotent, safe to run multiple times
-# Run inside WSL after first boot (or to update):
+#
+# Run inside WSL after setup-disks.ps1 (home/docker/brew vhdx mounted):
 #   sudo bash /mnt/c/Users/<user>/linuxdev/bootstrap-wsl.sh
 #
 # What gets installed:
-#   Base packages : git, zsh, curl, sudo, htop, tmux, jq, python3, kubectl, etc.
-#   linuxdev role : docker-ce, microk8s (snap), opentofu, Homebrew (/home/linuxbrew)
-#   linuxdev tools: rootfs-ro/rw, mount-disks, wsl-boot.sh, wsl.conf
+#   - git, zsh, curl, sudo, ca-certificates (bootstrap essentials)
+#   - docker-ce, microk8s, kubectl (via dotfiles install scripts)
+#   - rootfs-ro/rw toggle scripts
+#   - wsl-boot.sh + wsl.conf
+#
+# Dotfiles (Homebrew, zsh config, neovim, etc.) are NOT installed automatically.
+# Instructions are printed at the end.
 #
 # Options:
 #   --user <name>     Set default username (skips prompt)
-#   --skip-pkgs       Skip dotfiles/linux.sh install (tools + docker + microk8s)
-#   --dotfiles <url>  Use custom dotfiles repo (default: kennyhyun/dotfiles main)
+#   --skip-pkgs       Skip package installation
 #   --export          Print export instructions at end
 
 set -e
@@ -51,7 +55,6 @@ lock_rootfs() {
     if [ -f "$LINUXDEV_SCRIPTS/rootfs-ro.sh" ]; then
         bash "$LINUXDEV_SCRIPTS/rootfs-ro.sh" || log "WARNING: rootfs-ro partial failure"
     else
-        # Fallback — before scripts are installed
         for dir in /usr /bin /sbin /lib /lib64 /etc; do
             [ -d "$dir" ] || continue
             mountpoint -q "$dir" 2>/dev/null || mount --bind "$dir" "$dir" 2>/dev/null || true
@@ -78,7 +81,6 @@ SKIP_PACKAGES=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --user)      USERNAME="$2"; shift 2 ;;
-        --dotfiles)  DOTFILES_REPO="$2"; shift 2 ;;
         --export)    EXPORT_AFTER=1; shift ;;
         --skip-pkgs) SKIP_PACKAGES=1; shift ;;
         *) echo "Unknown arg: $1"; exit 1 ;;
@@ -116,40 +118,49 @@ log "Default user: $USERNAME"
 unlock_rootfs
 
 # =============================================
-# Step 3: Install via dotfiles linux.sh
+# Step 3: Install packages
 # =============================================
 if [ "$SKIP_PACKAGES" -ne 1 ]; then
-    log "Installing packages via dotfiles ($DOTFILES_REPO @ $DOTFILES_BRANCH)..."
-    log ""
-    log "This installs:"
-    log "  Base: git, zsh, curl, htop, tmux, jq, python3, kubectl, net-tools..."
-    log "  linuxdev role: docker-ce, microk8s, opentofu, Homebrew (/home/linuxbrew)"
-    log ""
+    log "Installing base packages..."
+    apt-get update -qq
+    apt-get install -y --no-install-recommends \
+        git ca-certificates curl wget \
+        zsh sudo \
+        apt-transport-https gnupg lsb-release \
+        dnsutils iputils-ping net-tools \
+        htop tmux jq \
+        psmisc
+    log "Base packages installed"
 
-    # Install git first — needed to clone dotfiles
-    if ! command -v git &>/dev/null; then
-        log "Installing git (required for dotfiles clone)..."
-        apt-get update -qq
-        apt-get install -y --no-install-recommends git ca-certificates
-    fi
-
-    # Clone to /var/tmp (exec allowed) instead of /tmp (noexec in WSL2)
-    TMPDIR_DOTFILES="$(mktemp -d -p /var/tmp)"
-    git clone -b "$DOTFILES_BRANCH" "$DOTFILES_REPO" "$TMPDIR_DOTFILES/dotfiles"
-    chmod -R +x "$TMPDIR_DOTFILES/dotfiles/scripts/"
-
-    if id "$USERNAME" &>/dev/null; then
-        # Run as target user so Homebrew installs to their home
-        sudo -u "$USERNAME" bash -c "
-            PRODUCTION=1 bash '$TMPDIR_DOTFILES/dotfiles/scripts/linux.sh' linuxdev
-        "
+    # Docker CE
+    log "Installing docker-ce..."
+    if ! command -v docker &>/dev/null; then
+        bash <(curl -fsSL https://raw.githubusercontent.com/kennyhyun/dotfiles/main/scripts/install_docker.sh)
+        log "docker-ce installed"
     else
-        # User not created yet — run as root, fix ownership later
-        PRODUCTION=1 bash "$TMPDIR_DOTFILES/dotfiles/scripts/linux.sh" linuxdev
+        log "docker already installed: $(docker --version)"
     fi
 
-    rm -rf "$TMPDIR_DOTFILES"
-    log "Packages installed"
+    # microk8s
+    log "Installing microk8s..."
+    if ! command -v microk8s &>/dev/null; then
+        bash <(curl -fsSL https://raw.githubusercontent.com/kennyhyun/dotfiles/main/scripts/install_microk8s.sh)
+        log "microk8s installed"
+    else
+        log "microk8s already installed"
+    fi
+
+    # kubectl
+    if ! command -v kubectl &>/dev/null; then
+        log "Installing kubectl..."
+        ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')"
+        curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/$ARCH/kubectl"
+        install -o root -g root -m 0755 kubectl "$LINUXDEV_BIN/kubectl"
+        rm kubectl
+        log "kubectl installed"
+    else
+        log "kubectl already installed: $(kubectl version --client --short 2>/dev/null || true)"
+    fi
 fi
 
 # =============================================
@@ -157,23 +168,24 @@ fi
 # =============================================
 if ! id "$USERNAME" &>/dev/null; then
     log "Creating user $USERNAME..."
-    useradd -m -s /bin/zsh -G sudo,docker,microk8s "$USERNAME" 2>/dev/null || \
-        useradd -m -s /bin/zsh -G sudo "$USERNAME"
+    useradd -m -s /bin/zsh -G sudo "$USERNAME" 2>/dev/null || \
+        useradd -m -s /bin/zsh "$USERNAME"
+    usermod -aG docker "$USERNAME" 2>/dev/null || true
+    usermod -aG microk8s "$USERNAME" 2>/dev/null || true
     echo "$USERNAME:$USERNAME" | chpasswd
-    log "User $USERNAME created (default password: $USERNAME — change with passwd)"
+    log "User $USERNAME created (default password: $USERNAME — change with: passwd)"
 else
     log "User $USERNAME already exists — updating shell and groups"
     usermod -s /bin/zsh "$USERNAME" 2>/dev/null || true
-    usermod -aG sudo "$USERNAME" 2>/dev/null || true
-    usermod -aG docker "$USERNAME" 2>/dev/null || true
+    usermod -aG sudo,docker "$USERNAME" 2>/dev/null || true
     usermod -aG microk8s "$USERNAME" 2>/dev/null || true
 fi
 
-# Sudoers (fixed filename — idempotent)
+# Sudoers — fixed filename, idempotent
 SUDOERS_FILE="/etc/sudoers.d/linuxdev-nopasswd"
 echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > "$SUDOERS_FILE"
 chmod 440 "$SUDOERS_FILE"
-log "Sudo nopasswd configured: $SUDOERS_FILE"
+log "Sudo nopasswd configured"
 
 # =============================================
 # Step 5: Install linuxdev scripts
@@ -184,7 +196,6 @@ cp "$SCRIPT_DIR/scripts/wsl/rootfs-ro.sh"   "$LINUXDEV_SCRIPTS/"
 cp "$SCRIPT_DIR/scripts/wsl/rootfs-rw.sh"   "$LINUXDEV_SCRIPTS/"
 cp "$SCRIPT_DIR/scripts/wsl/mount-disks.sh" "$LINUXDEV_SCRIPTS/"
 chmod +x "$LINUXDEV_SCRIPTS/"*.sh
-
 ln -sf "$LINUXDEV_SCRIPTS/rootfs-ro.sh" "$LINUXDEV_BIN/rootfs-ro"
 ln -sf "$LINUXDEV_SCRIPTS/rootfs-rw.sh" "$LINUXDEV_BIN/rootfs-rw"
 log "rootfs-ro / rootfs-rw available as commands"
@@ -217,11 +228,15 @@ lock_rootfs
 log ""
 log "================================================"
 log " Bootstrap complete ($(date))"
-log " Default user  : $USERNAME"
-log " wsl.conf      : $WSL_CONF"
-log " Scripts       : $LINUXDEV_SCRIPTS/"
+log " Default user: $USERNAME"
 log ""
-log " Apply: wsl --terminate Linuxdev  (from PowerShell)"
+log " NEXT: Apply changes by restarting WSL (PowerShell):"
+log "   wsl --terminate Debian"
+log "   wsl -d Debian"
+log ""
+log " NEXT: Install dotfiles (run as $USERNAME):"
+log "   git clone $DOTFILES_REPO ~/dotfiles"
+log "   PRODUCTION=1 bash ~/dotfiles/scripts/linux.sh linuxdev"
 log ""
 log " Rename user later:"
 log "   sudo rootfs-rw"
@@ -229,7 +244,7 @@ log "   sudo usermod -l newname -d /home/newname -m $USERNAME"
 log "   sudo groupmod -n newname $USERNAME"
 log "   sudo sed -i 's/default = .*/default = newname/' $WSL_CONF"
 log "   sudo rootfs-ro"
-log "   wsl --terminate Linuxdev"
+log "   wsl --terminate Debian  (from PowerShell)"
 log "================================================"
 
 if [ "$EXPORT_AFTER" -eq 1 ]; then
