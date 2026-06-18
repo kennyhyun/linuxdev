@@ -1,6 +1,7 @@
 param(
     [switch]$importDistro,
-    [switch]$noConfirm
+    [switch]$noConfirm,
+    [string]$localImage   # Path to local tar.gz/tar for offline install
 )
 
 . "$PSScriptRoot\..\common\installer-utils.ps1"
@@ -124,15 +125,54 @@ if ($existingDistro) {
     exit 0
 }
 
-if (-not $importDistro -and -not $noConfirm) {
+if (-not $importDistro -and -not $noConfirm -and -not $localImage) {
     Write-Host ""
     Write-Host "Install Linuxdev WSL2 distro now?"
-    Write-Host "  This downloads the vhdx image from GitHub Releases (several GB)."
-    $answer = Read-Host "Continue? [y/N]"
-    if ($answer -notmatch '^[Yy]') {
-        Write-Host "Skipped. Run 'setup.ps1 -wsl -importdistro' later."
-        exit 0
+    Write-Host "  [1] Skip (install later)"
+    Write-Host "  [2] Download from GitHub Releases (internet required, several GB)"
+    Write-Host "  [3] Install from Microsoft Store Debian (internet required)"
+    Write-Host "  [4] Use local image file (offline)"
+    $choice = Read-Host "Enter choice [1]"
+    switch ($choice.Trim()) {
+        "2" { $importDistro = $true }
+        "3" { $useStore = $true }
+        "4" {
+            $localImage = Read-Host "Path to .tar or .tar.gz file"
+            if (-not (Test-Path $localImage)) {
+                Write-Error "File not found: $localImage"
+                exit 1
+            }
+        }
+        default {
+            Write-Host "Skipped. Run 'setup.ps1 -wsl -importdistro' later."
+            exit 0
+        }
     }
+}
+
+# Option 3: Microsoft Store install
+if ($useStore) {
+    Write-Host "Installing Debian from Microsoft Store..."
+    wsl --install -d Debian
+    Write-Host ""
+    Write-Host "Debian installed. After setup, run bootstrap-wsl.sh inside WSL:"
+    Write-Host "  bash /mnt/c/Users/$env:USERNAME/linuxdev/bootstrap-wsl.sh"
+    exit 0
+}
+
+# Option 4: Local image
+if ($localImage) {
+    Write-Host "Installing from local image: $localImage"
+    New-Item -ItemType Directory -Force -Path $DistroDir | Out-Null
+    wsl --import $DistroName $DistroDir $localImage
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "wsl --import failed"
+        exit 1
+    }
+    Write-Host ""
+    Write-Host "Linuxdev distro installed from local image."
+    Write-Host "Run: wsl -d $DistroName"
+    exit 0
 }
 
 Write-Host "---------------------------------------"
