@@ -63,6 +63,10 @@ if (Test-Path "$InstallDir\.git") {
 } else {
     Write-Host "Cloning linuxdev to $InstallDir ..."
     git clone -b $Branch $RepoUrl $InstallDir
+    # Ensure .gitattributes eol settings are respected on Windows
+    git -C $InstallDir config core.autocrlf false
+    git -C $InstallDir rm --cached -r . 2>$null
+    git -C $InstallDir reset --hard HEAD
 }
 
 # --- Step 3: Run setup.ps1, forwarding any args ---

@@ -83,6 +83,14 @@ if ($envfileContent) {
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
             [System.Environment]::GetEnvironmentVariable("Path", "User")
 
+# Ensure .gitattributes line endings are respected (override autocrlf=input)
+$repoConfig = git -C $PSScriptRoot config core.autocrlf 2>$null
+if ($repoConfig -ne "false") {
+    git -C $PSScriptRoot config core.autocrlf false
+    git -C $PSScriptRoot rm --cached -r . 2>$null | Out-Null
+    git -C $PSScriptRoot reset --hard HEAD 2>$null | Out-Null
+}
+
 if ($withOsConfig) {
   & "$PSScriptRoot\scripts\basic-config.ps1"
 }

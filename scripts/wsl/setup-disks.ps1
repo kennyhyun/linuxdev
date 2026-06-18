@@ -53,7 +53,8 @@ function Ensure-Vhdx {
     } else {
         $sizeBytes = [long]$SizeGB * 1GB
         $sizeName = [System.IO.Path]::GetFileName($Path)
-        Write-Host "  Creating $sizeName (${SizeGB} GB dynamic)..."
+        $sizeStr = "$SizeGB"
+        Write-Host "  Creating $sizeName ($sizeStr GB dynamic)..."
         New-VHD -Path $Path -SizeBytes $sizeBytes -Dynamic | Out-Null
         Write-Host "  Created: $Path"
     }
