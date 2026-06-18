@@ -52,7 +52,8 @@ function Ensure-Vhdx {
         Write-Host "  $([System.IO.Path]::GetFileName($Path)) already exists — skipping create"
     } else {
         $sizeBytes = [long]$SizeGB * 1GB
-        Write-Host "  Creating $([System.IO.Path]::GetFileName($Path)) ($SizeGB GB dynamic)..."
+        $sizeName = [System.IO.Path]::GetFileName($Path)
+        Write-Host "  Creating $sizeName (${SizeGB} GB dynamic)..."
         New-VHD -Path $Path -SizeBytes $sizeBytes -Dynamic | Out-Null
         Write-Host "  Created: $Path"
     }
@@ -190,7 +191,8 @@ Write-Host " (wsl --mount is needed from PowerShell before WSL starts)"
 Write-Host ""
 Write-Host " To attach on Windows startup, add to Task Scheduler or startup script:"
 foreach ($disk in $disks) {
-    Write-Host "   wsl --mount --vhd `"$DiskDir\$($disk.File)`" --bare"
+    $diskPath = "$DiskDir\$($disk.File)"
+    Write-Host "   wsl --mount --vhd '$diskPath' --bare"
 }
 Write-Host ""
 Write-Host " Or run manually before starting WSL:"
