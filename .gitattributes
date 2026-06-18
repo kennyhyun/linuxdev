@@ -1,0 +1,15 @@
+# Shell scripts must always have LF line endings
+*.sh        text eol=lf
+*.bash      text eol=lf
+
+# PowerShell scripts — CRLF on Windows is fine, but LF also works
+*.ps1       text eol=crlf
+*.psm1      text eol=crlf
+*.psd1      text eol=crlf
+
+# Config files
+*.conf      text eol=lf
+*.inf       text eol=lf
+
+# Everything else — auto-detect
+*           text=auto
