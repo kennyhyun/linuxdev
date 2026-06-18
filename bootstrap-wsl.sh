@@ -126,6 +126,13 @@ if [ "$SKIP_PACKAGES" -ne 1 ]; then
     log "  linuxdev role: docker-ce, microk8s, opentofu, Homebrew (/home/linuxbrew)"
     log ""
 
+    # Install git first — needed to clone dotfiles
+    if ! command -v git &>/dev/null; then
+        log "Installing git (required for dotfiles clone)..."
+        apt-get update -qq
+        apt-get install -y --no-install-recommends git ca-certificates
+    fi
+
     # Clone to temp dir, run as target user if they exist, else as root
     TMPDIR_DOTFILES="$(mktemp -d)"
     git clone -b "$DOTFILES_BRANCH" "$DOTFILES_REPO" "$TMPDIR_DOTFILES/dotfiles"
