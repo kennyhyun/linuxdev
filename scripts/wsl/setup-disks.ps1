@@ -8,9 +8,9 @@
 #   .\scripts\wsl\setup-disks.ps1 -AttachOnly      # attach existing vhdx (no format)
 #
 # Disk layout:
-#   home.vhdx   → /home             label: linuxdev-home
-#   docker.vhdx → /var/lib/docker   label: linuxdev-docker
-#   brew.vhdx   → /home/linuxbrew   label: linuxdev-brew
+#   home.vhdx   -> /home             label: linuxdev-home
+#   docker.vhdx -> /var/lib/docker   label: linuxdev-docker
+#   brew.vhdx   -> /home/linuxbrew   label: linuxdev-brew
 
 param(
     [string]$DistroName   = "Linuxdev",
@@ -19,7 +19,7 @@ param(
     [int]$DockerSizeGB    = 50,
     [int]$BrewSizeGB      = 10,
     [switch]$SkipBrew,
-    [switch]$AttachOnly   # Attach and mount existing disks without formatting
+    [switch]$AttachOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -48,13 +48,13 @@ function Refresh-Path {
 # Helper: create vhdx if not exists
 function Ensure-Vhdx {
     param([string]$Path, [int]$SizeGB, [string]$Label)
+    $fileName = [System.IO.Path]::GetFileName($Path)
     if (Test-Path $Path) {
-        Write-Host "  $([System.IO.Path]::GetFileName($Path)) already exists — skipping create"
+        Write-Host "  $fileName already exists - skipping create"
     } else {
         $sizeBytes = [long]$SizeGB * 1GB
-        $sizeName = [System.IO.Path]::GetFileName($Path)
         $sizeInfo = $SizeGB.ToString() + "GB dynamic"
-        Write-Host "  Creating $sizeName [$sizeInfo]..."
+        Write-Host "  Creating $fileName [$sizeInfo]..."
         New-VHD -Path $Path -SizeBytes $sizeBytes -Dynamic | Out-Null
         Write-Host "  Created: $Path"
     }
@@ -71,7 +71,7 @@ function Setup-WslDisk {
 
     $vhdxName = [System.IO.Path]::GetFileName($VhdxPath)
     Write-Host ""
-    Write-Host "--- $vhdxName → $MountPoint ---"
+    Write-Host "--- $vhdxName -> $MountPoint ---"
 
     # Attach VHD to WSL
     Write-Host "  Attaching $vhdxName to WSL..."
@@ -82,42 +82,41 @@ function Setup-WslDisk {
     }
     Start-Sleep -Milliseconds 500
 
-    # Find the new /dev/sdX device inside WSL
-    $devPath = wsl -d $DistroName -- bash -c "
+    # Find the new /dev/sdX device inside WSL (freshly attached = no label yet)
+    $devPath = wsl -d $DistroName -- bash -c @'
         lsblk -rno NAME,SIZE | while read name size; do
-            dev=\"/dev/\$name\"
-            label=\$(blkid -o value -s LABEL \"\$dev\" 2>/dev/null || true)
-            if [ -z \"\$label\" ] && [ ! -b \"\${dev}1\" ] && lsblk -no TYPE \"\$dev\" 2>/dev/null | grep -q disk; then
-                # No partition table, no label = freshly attached
-                echo \"\$dev\"
+            dev="/dev/$name"
+            label=$(blkid -o value -s LABEL "$dev" 2>/dev/null || true)
+            if [ -z "$label" ] && [ ! -b "${dev}1" ] && lsblk -no TYPE "$dev" 2>/dev/null | grep -q disk; then
+                echo "$dev"
                 break
             fi
         done
-    " 2>$null
+'@ 2>$null
 
     if (-not $devPath) {
-        # Try finding by label if already formatted
+        # Already formatted - find by label
         $devPath = wsl -d $DistroName -- bash -c "blkid -L '$Label' 2>/dev/null || true" 2>$null
     }
 
     if (-not $devPath) {
-        Write-Host "  WARNING: Could not find device for $vhdxName — attach manually"
+        Write-Host "  WARNING: Could not find device for $vhdxName - attach manually"
         return
     }
 
     $devPath = $devPath.Trim()
     Write-Host "  Device: $devPath"
 
-    # Format if requested (first time)
+    # Format if requested (first time setup)
     if ($Format) {
-        Write-Host "  Formatting $devPath as ext4 with label '$Label'..."
+        Write-Host "  Formatting $devPath as ext4 [label: $Label]..."
         wsl -d $DistroName -u root -- bash -c "mkfs.ext4 -L '$Label' -F '$devPath'"
         Write-Host "  Formatted: $devPath"
     }
 
-    # Create mount point and mount
+    # Mount
     wsl -d $DistroName -u root -- bash -c "mkdir -p '$MountPoint' && mount '$devPath' '$MountPoint'"
-    Write-Host "  Mounted: $devPath → $MountPoint"
+    Write-Host "  Mounted: $devPath -> $MountPoint"
     Write-Host "  Done: $vhdxName"
 }
 
@@ -132,11 +131,12 @@ if (-not $SkipBrew) {
     $disks += @{ File = "brew.vhdx"; SizeGB = $BrewSizeGB; Mount = "/home/linuxbrew"; Label = "linuxdev-brew" }
 }
 
+$modeStr = if ($AttachOnly) { "attach only" } else { "create + format + mount" }
 Write-Host "========================================"
 Write-Host " Linuxdev WSL2 Disk Setup"
 Write-Host " Distro : $DistroName"
 Write-Host " DiskDir: $DiskDir"
-Write-Host " Mode   : $(if ($AttachOnly) { 'attach only' } else { 'create + format + mount' })"
+Write-Host " Mode   : $modeStr"
 Write-Host "========================================"
 
 # =============================================
@@ -151,7 +151,7 @@ if (-not $AttachOnly) {
 }
 
 # =============================================
-# Terminate distro, setup disks, restart
+# Terminate distro, attach disks, restart
 # =============================================
 Write-Host ""
 Write-Host "Terminating $DistroName for clean disk attach..."
@@ -159,7 +159,6 @@ wsl --terminate $DistroName 2>$null
 Start-Sleep -Seconds 2
 
 Write-Host "Starting $DistroName..."
-# Start distro in background
 $job = Start-Job { wsl -d $args[0] -- sleep 30 } -ArgumentList $DistroName
 Start-Sleep -Seconds 3
 
@@ -176,26 +175,23 @@ foreach ($disk in $disks) {
 Stop-Job $job -ErrorAction SilentlyContinue
 Remove-Job $job -ErrorAction SilentlyContinue
 
-# =============================================
-# Update wsl-boot.sh awareness
-# =============================================
+# Verify
 Write-Host ""
-Write-Host "Verifying mount-disks.sh knows the labels..."
+Write-Host "Verifying labels..."
 wsl -d $DistroName -u root -- bash -c 'blkid -o list 2>/dev/null | grep linuxdev && echo OK || echo "(none yet)"'
 
 Write-Host ""
 Write-Host "========================================"
 Write-Host " Disk setup complete."
 Write-Host ""
-Write-Host " Disks will auto-mount on boot via wsl-boot.sh + mount-disks.sh"
-Write-Host " (wsl --mount is needed from PowerShell before WSL starts)"
+Write-Host " Disks auto-mount on boot via wsl-boot.sh + mount-disks.sh"
+Write-Host " NOTE: wsl --mount must run before WSL starts (see attach-disks.ps1)"
 Write-Host ""
-Write-Host " To attach on Windows startup, add to Task Scheduler or startup script:"
+Write-Host " To attach on Windows startup:"
 foreach ($disk in $disks) {
     $diskPath = "$DiskDir\$($disk.File)"
     Write-Host "   wsl --mount --vhd '$diskPath' --bare"
 }
 Write-Host ""
-Write-Host " Or run manually before starting WSL:"
-Write-Host "   .\scripts\wsl\attach-disks.ps1"
+Write-Host " Or run: .\scripts\wsl\attach-disks.ps1"
 Write-Host "========================================"
