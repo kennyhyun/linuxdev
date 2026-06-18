@@ -139,63 +139,80 @@ Write-Host "---------------------------------------"
 Write-Host "Downloading Linuxdev distro from GitHub Releases..."
 New-Item -ItemType Directory -Force -Path $DistroDir | Out-Null
 
-# Check gh auth
-$ghAuth = gh auth status 2>&1
-if ($LASTEXITCODE -ne 0) {
-    Write-Host ""
-    Write-Host "GitHub CLI is not authenticated. Please login first:"
-    Write-Host "  gh auth login"
-    Write-Host "Then run: setup.ps1 -wsl -importdistro"
+# Use GitHub API directly — no auth needed for public repos
+$apiUrl = "https://api.github.com/repos/$GithubRepo/releases/latest"
+Write-Host "Fetching latest release info from $GithubRepo ..."
+try {
+    $release = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing
+} catch {
+    Write-Error "Could not fetch release info: $_"
     exit 1
 }
-
-# Get latest release tag
-$latestRelease = gh release list --repo $GithubRepo --limit 1 --json tagName |
-                 ConvertFrom-Json
-if (-not $latestRelease) {
-    Write-Error "Could not fetch release info from $GithubRepo"
-    exit 1
-}
-$tag = $latestRelease[0].tagName
+$tag = $release.tag_name
 Write-Host "Latest release: $tag"
 
-# Download vhdx split volumes + checksum
-Write-Host "Downloading assets..."
-gh release download $tag `
-    --repo $GithubRepo `
-    --pattern "*x64*.vhdx.7z*" `
-    --pattern "*x64*.sha256" `
-    --dir $DistroDir
+# Find x64 vhdx assets (prefer vhdx, fall back to any arch if no x64)
+$assets = $release.assets
+$vhdxAssets = $assets | Where-Object { $_.name -match "x64.*vhdx.*7z" }
+if (-not $vhdxAssets) {
+    # No x64 vhdx yet — inform user and exit gracefully
+    Write-Host ""
+    Write-Host "No x64 vhdx release found. Available assets:"
+    $assets | ForEach-Object { Write-Host "  $($_.name)" }
+    Write-Host ""
+    Write-Host "The current release only has arm64 qcow2 images (for macOS QEMU)."
+    Write-Host "An x64 vhdx release is needed for WSL2 import."
+    Write-Host "Skipping distro install. Check back later for a new release."
+    exit 0
+}
+$sha256Asset = $assets | Where-Object { $_.name -match "x64.*sha256" } | Select-Object -First 1
 
-# Verify checksum (basic)
-$sha256File = Get-ChildItem $DistroDir -Filter "*x64*.sha256" | Select-Object -First 1
-$firstVol   = Get-ChildItem $DistroDir -Filter "*x64*.vhdx.7z.001" | Select-Object -First 1
-
-if (-not $firstVol) {
-    # Might be a single volume
-    $firstVol = Get-ChildItem $DistroDir -Filter "*x64*.vhdx.7z" | Select-Object -First 1
+# Download split volumes
+Write-Host "Downloading $($vhdxAssets.Count) archive volume(s)..."
+foreach ($asset in $vhdxAssets) {
+    $outFile = "$DistroDir\$($asset.name)"
+    if (Test-Path $outFile) {
+        Write-Host "  $($asset.name) already exists, skipping"
+    } else {
+        Write-Host "  Downloading $($asset.name) ($([math]::Round($asset.size/1MB, 1)) MB)..."
+        Invoke-WebRequest -UseBasicParsing -Uri $asset.browser_download_url -OutFile $outFile
+    }
 }
 
+# Download checksum
+$sha256File = $null
+if ($sha256Asset) {
+    $sha256Path = "$DistroDir\$($sha256Asset.name)"
+    Invoke-WebRequest -UseBasicParsing -Uri $sha256Asset.browser_download_url -OutFile $sha256Path
+    $sha256File = Get-Item $sha256Path
+}
+
+$firstVol = Get-ChildItem $DistroDir -Filter "*x64*.vhdx.7z.001" | Sort-Object Name | Select-Object -First 1
 if (-not $firstVol) {
-    Write-Error "No vhdx archive found in $DistroDir"
+    $firstVol = Get-ChildItem $DistroDir -Filter "*x64*.vhdx.7z" | Sort-Object Name | Select-Object -First 1
+}
+if (-not $firstVol) {
+    Write-Error "No vhdx archive found in $DistroDir after download"
     exit 1
 }
 
+# Verify checksum
 if ($sha256File) {
     Write-Host "Verifying checksum..."
-    Push-Location $DistroDir
-    $expected = (Get-Content $sha256File.FullName | Where-Object { $_ -match $firstVol.Name } | ForEach-Object { $_.Split()[0] })
+    $expected = (Get-Content $sha256File.FullName |
+                 Where-Object { $_ -match [regex]::Escape($firstVol.Name) } |
+                 ForEach-Object { $_.Split()[0] })
     if ($expected) {
         $actual = (Get-FileHash $firstVol.FullName -Algorithm SHA256).Hash.ToLower()
         if ($actual -eq $expected.ToLower()) {
             Write-Host "Checksum OK"
         } else {
-            Write-Error "Checksum mismatch. Download may be corrupted."
-            Pop-Location
+            Write-Error "Checksum mismatch on $($firstVol.Name). Download may be corrupted."
             exit 1
         }
+    } else {
+        Write-Host "Checksum entry not found for $($firstVol.Name), skipping verification"
     }
-    Pop-Location
 }
 
 # Extract
