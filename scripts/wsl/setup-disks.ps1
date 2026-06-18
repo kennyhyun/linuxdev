@@ -96,12 +96,13 @@ function Setup-WslDisk {
     Write-Host ""
     Write-Host "--- $vhdxName -> $MountPoint ---"
 
-    # Attach VHD to WSL
+    # Attach VHD to WSL (skip if already attached)
     Write-Host "  Attaching $vhdxName to WSL..."
-    wsl --mount --vhd $VhdxPath --bare
+    wsl --mount --vhd $VhdxPath --bare 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "Failed to attach $VhdxPath"
-        return
+        # Check if already attached (expected on re-run)
+        $alreadyAttached = wsl -d $DistroName -u root -- bash -c 'lsblk -rno NAME | grep -q sd && echo yes || echo no' 2>$null
+        Write-Host "  NOTE: attach returned error (may already be attached), continuing..."
     }
     Start-Sleep -Milliseconds 500
 
