@@ -32,8 +32,10 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 }
 
 # Check WSL distro exists
-$distros = wsl --list --quiet 2>$null
-if (-not ($distros | Where-Object { $_ -match "^$DistroName" })) {
+$distros = (wsl --list --quiet 2>$null) -replace "`0", "" | Where-Object { $_ -ne "" }
+if (-not ($distros | Where-Object { $_.Trim() -eq $DistroName })) {
+    Write-Host "Available distros:"
+    $distros | ForEach-Object { Write-Host "  '$_'" }
     Write-Error "Distro '$DistroName' not found. Run: wsl --list"
     exit 1
 }
