@@ -14,7 +14,18 @@ common_name=$local_ip_addr
 passphrase=pass:passwd
 
 tmpdir=$(mktemp -d)
-client_certs_dir=/vagrant/certs/
+# 디렉토리 선택 로직
+if [ -d "/vagrant/certs/" ]; then
+  client_certs_dir=/vagrant/certs/
+  echo "Using Vagrant certs directory"
+elif [ -d "/home/$(whoami)/workspace" ]; then
+  client_certs_dir=/home/$(whoami)/workspace/certs/
+  mkdir -p "$client_certs_dir"
+  echo "Using workspace certs directory: $client_certs_dir"
+else
+  client_certs_dir=/mnt/host/
+  echo "Using mnt/host directory"
+fi
 server_certs_dir=/var/docker/
 
 pushd $tmpdir
