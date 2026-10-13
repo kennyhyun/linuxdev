@@ -212,6 +212,10 @@ switch ($vmBackend) {
         -importDistro:([bool]$importDistro) `
         -noConfirm:([bool]$noConfirm) `
         -envFile $envPath
+    if ($LASTEXITCODE -eq 2) {
+        # install-wsl2 signalled "reboot required" -- stop here, do not print "Done".
+        exit 2
+    }
   }
 
   "vagrant" {

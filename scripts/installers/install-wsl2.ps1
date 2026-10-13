@@ -41,7 +41,9 @@ foreach ($feature in $features) {
     } else {
         Write-Host "  Enabling $feature ..."
         $result = Enable-WindowsOptionalFeature -Online -FeatureName $feature -NoRestart -ErrorAction SilentlyContinue
-        if ($result -and $result.RestartNeeded) { $rebootNeeded = $true }
+        # A feature that was NOT already enabled requires a reboot to take effect.
+        # Do not rely solely on $result.RestartNeeded -- it is unreliable here.
+        $rebootNeeded = $true
     }
 }
 
@@ -93,18 +95,34 @@ if (Get-Command gh -ErrorAction SilentlyContinue) {
 }
 
 # =============================================
-# Reboot if needed
+# Reboot gate -- must pass before any distro work
 # =============================================
-if ($rebootNeeded) {
+# WSL features only take effect after a reboot. Verify WSL is actually
+# operational; if a feature was just enabled OR WSL cannot run, stop here with a
+# clear message instead of failing later with WSL_E_DISTRO_NOT_FOUND.
+$wslWorks = $false
+try {
+    wsl --status 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0) { $wslWorks = $true }
+} catch { $wslWorks = $false }
+
+if ($rebootNeeded -or -not $wslWorks) {
     Write-Host ""
-    Write-Host "NOTICE: Reboot required to complete WSL2 feature activation."
-    Write-Host "After rebooting, run: setup.ps1 -wsl"
+    Write-Host "================================================"
+    Write-Host " REBOOT REQUIRED"
+    Write-Host " WSL2 features were enabled but are not active until you reboot."
+    Write-Host ""
+    Write-Host " 1. Reboot Windows."
+    Write-Host " 2. Re-run:  .\setup.ps1 -wsl"
+    Write-Host "================================================"
     if (-not $noConfirm) {
         $ans = Read-Host "Reboot now? [y/N]"
         if ($ans -match '^[Yy]') { Restart-Computer -Force }
     }
-    exit 0
+    # Do NOT continue to distro install -- WSL is not usable yet.
+    exit 2
 }
+Write-Host "WSL is operational."
 
 # =============================================
 # Distro install
