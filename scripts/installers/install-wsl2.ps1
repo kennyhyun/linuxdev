@@ -9,7 +9,8 @@
 param(
     [switch]$importDistro,
     [switch]$noConfirm,
-    [string]$localImage
+    [string]$localImage,
+    [string]$envFile = "$PSScriptRoot\..\..\.env"
 )
 
 . "$PSScriptRoot\..\common\installer-utils.ps1"
@@ -118,12 +119,67 @@ if ($importDistro -or (-not $noConfirm)) {
     $choice = if ($importDistro) { "3" } elseif ($localImage) { "4" } else { Read-Host "Enter choice [1]" }
 
     switch ($choice.Trim()) {
-        "2" { & "$PSScriptRoot\..\wsl\install-distro-store.ps1" }
-        "3" { & "$PSScriptRoot\..\wsl\install-distro-github.ps1" }
+        "2" { & "$PSScriptRoot\..\wsl\install-distro-store.ps1";  $installed = $true }
+        "3" { & "$PSScriptRoot\..\wsl\install-distro-github.ps1"; $installed = $true }
         "4" {
             $img = if ($localImage) { $localImage } else { Read-Host "Path to .tar or .tar.gz" }
             & "$PSScriptRoot\..\wsl\install-distro-local.ps1" -ImagePath $img
+            $installed = $true
         }
         default { Write-Host "Skipped. Run install-distro-*.ps1 later." }
     }
+
+    # --- Auto-bootstrap the distro (non-interactive, driven by .env) ---
+    if ($installed) {
+        $distro = $script:DefaultDistroName   # "Linuxdev"
+
+        # Convert a Windows path (C:\Users\me\x) to a WSL path (/mnt/c/Users/me/x)
+        function ConvertTo-WslPath($winPath) {
+            $full = (Resolve-Path $winPath -ErrorAction SilentlyContinue).Path
+            if (-not $full) { $full = $winPath }
+            if ($full -match '^([A-Za-z]):\\(.*)$') {
+                $drive = $matches[1].ToLower()
+                $rest  = $matches[2] -replace '\\','/'
+                return "/mnt/$drive/$rest"
+            }
+            return ($full -replace '\\','/')
+        }
+
+        $repoRoot = (Resolve-Path "$PSScriptRoot\..\..").Path
+        $repoUnc  = ConvertTo-WslPath $repoRoot
+        $envUnc   = ConvertTo-WslPath $envFile
+
+        Write-Host ""
+        Write-Host "Bootstrapping $distro (non-interactive)..."
+        wsl -d $distro -u root -- bash "$repoUnc/bootstrap-wsl.sh" --noninteractive --envfile "$envUnc"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "bootstrap-wsl.sh exited $LASTEXITCODE. Re-run manually:"
+            Write-Host "  wsl -d $distro -u root -- bash $repoUnc/bootstrap-wsl.sh --noninteractive --envfile $envUnc"
+        }
+        Write-Host ""
+        Write-Host "Apply systemd/boot changes:  wsl --terminate $distro  (then)  wsl -d $distro"
+    }
 }
+
+# =============================================
+# Optional: GitLab Runner (CI) -- guidance only
+# =============================================
+# The runner is NOT installed here. It is an optional add-on for turning this
+# machine into a CI runner host. The install lives inside the distro (bash) and
+# the auto-start is a Windows scheduled task -- both are run on demand.
+Write-Host ""
+Write-Host "----- Optional: GitLab Runner (CI) -----"
+Write-Host "To turn this WSL2 machine into a GitLab CI runner, run these AFTER the"
+Write-Host "distro is installed and bootstrapped (bootstrap-wsl.sh sets up docker):"
+Write-Host ""
+Write-Host "  1) Install + register the runner (inside WSL, as root):"
+Write-Host "       sudo bash scripts/wsl/install-runner.sh \"
+Write-Host "         --url https://gitlab.imaginetoolbox.com \"
+Write-Host "         --token <registration-token> \"
+Write-Host "         --tags linux,localstack,runner --autostart"
+Write-Host ""
+Write-Host "  2) Auto-start the distro at Windows logon (admin PowerShell):"
+Write-Host "       .\scripts\wsl\register-autostart.ps1 -DistroName <DistroName>"
+Write-Host ""
+Write-Host "  Skip both if you only need a local dev environment."
+Write-Host "----------------------------------------"

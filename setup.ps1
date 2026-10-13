@@ -65,6 +65,18 @@ Write-Host " Linuxdev Setup"
 Write-Host " Common: git, windows terminal"
 Write-Host " VM backend: selectable (wsl2 / virtualbox+vagrant / none)"
 Write-Host "================================================"
+Write-Host " Options:"
+Write-Host "   -wsl          set up WSL2 backend (recommended for Win11)"
+Write-Host "   -vagrant      set up VirtualBox + Vagrant backend (legacy)"
+Write-Host "   -novm         minimal: common tools only, skip VM backend"
+Write-Host "   -nodevtools   skip Windows Terminal"
+Write-Host "   -nogit        skip Git install"
+Write-Host "   -vscode       also install VSCode"
+Write-Host "   -noconfirm    non-interactive (no prompts)"
+Write-Host ""
+Write-Host " Minimal install example (tools only, no VM):"
+Write-Host "   .\setup.ps1 -novm -nodevtools -noconfirm"
+Write-Host "================================================"
 if (-not $noConfirm) {
   Read-Host -Prompt "Press Enter to continue or Ctrl+C to stop"
 }
@@ -136,9 +148,37 @@ switch ($vmBackend) {
   "wsl" {
     Write-Host ""
     Write-Host "======= WSL2 Setup ======="
+
+    # --- Interactive .env collection (ask only if empty; save to .env) ---
+    $envPath = "$PSScriptRoot\.env"
+    function Get-OrAsk($key, $prompt, $default) {
+      $cur = $envfile[$key]
+      if ($cur) { return $cur }
+      if ($noConfirm) {
+        $val = $default
+      } else {
+        $in = Read-Host "$prompt [$default]"
+        $val = if ([string]::IsNullOrWhiteSpace($in)) { $default } else { $in.Trim() }
+      }
+      Add-Content $envPath "$key=$val"
+      $envfile[$key] = $val
+      return $val
+    }
+    Get-OrAsk "WSL_USERNAME"     "Default Linux username (UID 1000)"                "linuxdev"  | Out-Null
+    Get-OrAsk "NAME"             "Linux hostname"                                   "linuxdev"  | Out-Null
+    Get-OrAsk "MEMORY"           "WSL2 memory limit in MB (global)"                 "4096"      | Out-Null
+    Get-OrAsk "CPUS"             "WSL2 CPU count (global)"                          "4"         | Out-Null
+    Get-OrAsk "WSL_AUTO_RECLAIM" "Memory auto-reclaim (gradual/dropcache/disabled)" "gradual"   | Out-Null
+    Get-OrAsk "WSL_SWAP"         "WSL2 swap in MB (0 to disable)"                   "0"         | Out-Null
+    Get-OrAsk "DOTFILES_REPO"    "Dotfiles repo URL (blank to skip)"                ""          | Out-Null
+
+    # --- Host-global .wslconfig from .env (memory/cpu/reclaim/swap) ---
+    & "$PSScriptRoot\scripts\wsl\configure-wslconfig.ps1" -EnvFile $envPath
+
     & "$PSScriptRoot\scripts\installers\install-wsl2.ps1" `
         -importDistro:([bool]$importDistro) `
-        -noConfirm:([bool]$noConfirm)
+        -noConfirm:([bool]$noConfirm) `
+        -envFile $envPath
   }
 
   "vagrant" {
