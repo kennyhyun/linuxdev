@@ -109,14 +109,19 @@ if ($rebootNeeded) {
 # =============================================
 # Distro install
 # =============================================
-if ($importDistro -or (-not $noConfirm)) {
+if ($importDistro -or $localImage -or (-not $noConfirm)) {
     Write-Host ""
     Write-Host "Install WSL2 distro?"
     Write-Host "  [1] Skip"
     Write-Host "  [2] Microsoft Store (Debian)"
     Write-Host "  [3] GitHub Releases (linuxdev custom)"
     Write-Host "  [4] Local file (offline)"
-    $choice = if ($importDistro) { "3" } elseif ($localImage) { "4" } else { Read-Host "Enter choice [1]" }
+    # Non-interactive selection: -importdistro -> GitHub custom; -localImage -> local;
+    # otherwise (plain -noConfirm) default to Store (Debian). Interactive: ask.
+    $choice = if ($importDistro) { "3" }
+              elseif ($localImage) { "4" }
+              elseif ($noConfirm) { "2" }
+              else { Read-Host "Enter choice [1]" }
 
     switch ($choice.Trim()) {
         "2" { & "$PSScriptRoot\..\wsl\install-distro-store.ps1";  $installed = $true }

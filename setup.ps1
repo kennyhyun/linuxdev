@@ -62,21 +62,53 @@ if ($OsBuildNumber -lt 19041) {
 
 Write-Host "================================================"
 Write-Host " Linuxdev Setup"
-Write-Host " Common: git, windows terminal"
-Write-Host " VM backend: selectable (wsl2 / virtualbox+vagrant / none)"
 Write-Host "================================================"
-Write-Host " Options:"
-Write-Host "   -wsl          set up WSL2 backend (recommended for Win11)"
-Write-Host "   -vagrant      set up VirtualBox + Vagrant backend (legacy)"
-Write-Host "   -novm         minimal: common tools only, skip VM backend"
-Write-Host "   -nodevtools   skip Windows Terminal"
-Write-Host "   -nogit        skip Git install"
-Write-Host "   -vscode       also install VSCode"
-Write-Host "   -noconfirm    non-interactive (no prompts)"
-Write-Host ""
-Write-Host " Minimal install example (tools only, no VM):"
-Write-Host "   .\setup.ps1 -novm -nodevtools -noconfirm"
-Write-Host "================================================"
+
+# Did the user pass any meaningful option?
+$hasOptions = $args.Count -gt 0
+
+if (-not $hasOptions) {
+  # No options: show full usage + examples
+  Write-Host " Common tools: git, windows terminal (always, unless skipped)"
+  Write-Host " VM backend:   wsl2 / virtualbox+vagrant / none (selectable)"
+  Write-Host ""
+  Write-Host " Options:"
+  Write-Host "   -wsl          set up WSL2 backend (recommended for Win11)"
+  Write-Host "   -vagrant      set up VirtualBox + Vagrant backend (legacy)"
+  Write-Host "   -novm         minimal: common tools only, skip VM backend"
+  Write-Host "   -nodevtools   skip Windows Terminal"
+  Write-Host "   -nogit        skip Git install"
+  Write-Host "   -vscode       also install VSCode"
+  Write-Host "   -importdistro install the WSL2 distro automatically"
+  Write-Host "   -noconfirm    non-interactive (use .env / defaults, no prompts)"
+  Write-Host ""
+  Write-Host " Examples:"
+  Write-Host "   .\setup.ps1 -wsl                          WSL2, interactive (recommended)"
+  Write-Host "   .\setup.ps1 -wsl -noconfirm               WSL2, non-interactive (Store distro, .env defaults)"
+  Write-Host "   .\setup.ps1 -wsl -importdistro            WSL2 + custom distro from GitHub Releases"
+  Write-Host "   .\setup.ps1 -vagrant                      VirtualBox + Vagrant (legacy)"
+  Write-Host "   .\setup.ps1 -novm -nodevtools -noconfirm  minimal: tools only"
+  Write-Host "================================================"
+} else {
+  # Options given: explain what the current invocation will do
+  Write-Host " This run will:"
+  if ($noGit)     { Write-Host "   - skip Git install" }       else { Write-Host "   - install/verify Git" }
+  if ($noTerminal){ Write-Host "   - skip Windows Terminal" }   else { Write-Host "   - install/verify Windows Terminal" }
+  if ($withVsCode){ Write-Host "   - install VSCode" }
+  switch ($vmBackend) {
+    "wsl"     { Write-Host "   - set up WSL2 backend" ;
+                if ($importDistro) { Write-Host "       + install the WSL2 distro (GitHub Releases)" }
+                elseif ($noConfirm) { Write-Host "       + non-interactive: Store distro + .env defaults" }
+                else { Write-Host "       + interactive: choose distro + enter .env values" } }
+    "vagrant" { Write-Host "   - set up VirtualBox + Vagrant backend (disables Hyper-V)" }
+    "none"    { Write-Host "   - skip VM backend setup (tools only)" }
+    default   { Write-Host "   - prompt for VM backend (none/wsl2/vagrant)" }
+  }
+  if ($noConfirm) { Write-Host "   - run non-interactively (no prompts)" }
+  Write-Host "================================================"
+  Write-Host " Run with no options to see all flags and examples."
+  Write-Host "================================================"
+}
 if (-not $noConfirm) {
   Read-Host -Prompt "Press Enter to continue or Ctrl+C to stop"
 }
