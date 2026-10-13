@@ -186,6 +186,141 @@ If DOTFILES_REPO has been defined in `.env`, it clones the repo to ~/dotfiles an
 
 any of files which is executable.
 
+## Setting up with WSL2 (Windows 11)
+
+> Alternative to VirtualBox + Vagrant. Recommended for Windows 11 users who
+> prefer WSL2. Entry point is still `setup.ps1`.
+
+### 1. Run setup with the WSL2 backend
+
+Open **PowerShell as Administrator**:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\setup.ps1 -wsl
+```
+
+`setup.ps1` installs the common tools (Git, Windows Terminal) and then calls
+`scripts\installers\install-wsl2.ps1`, which:
+
+- Enables the WSL2 Windows features (WSL, VirtualMachinePlatform, HypervisorPlatform)
+- Installs 7-Zip and GitHub CLI
+- Collects settings interactively and saves them to `.env` (see table below)
+- Writes `%USERPROFILE%\.wslconfig` (memory/CPU/swap/auto-reclaim)
+- Installs a distro (Microsoft Store / GitHub Releases / local file)
+- Automatically runs `bootstrap-wsl.sh` inside the distro (non-interactive)
+
+You do **not** run `install-wsl2.ps1` directly -- `setup.ps1 -wsl` invokes it.
+
+> A reboot may be required after enabling WSL2 features. Re-run `setup.ps1 -wsl`
+> afterwards to continue.
+
+### Configuration (.env)
+
+`setup.ps1 -wsl` asks for these on first run and saves them to `.env`
+(re-runs reuse saved values; `-noconfirm` uses defaults):
+
+| key | target | default | meaning |
+|-----|--------|---------|---------|
+| MEMORY | .wslconfig | 4096 | WSL2 memory cap (MB, **global** to all distros) |
+| CPUS | .wslconfig | 4 | WSL2 CPU count (**global**) |
+| WSL_AUTO_RECLAIM | .wslconfig | gradual | memory auto-reclaim (gradual/dropcache/disabled) |
+| WSL_SWAP | .wslconfig | 0 | swap (MB), 0 to disable |
+| WSL_USERNAME | distro | linuxdev | default Linux user (created with UID 1000) |
+| NAME | wsl.conf | linuxdev | Linux hostname |
+| DOTFILES_REPO | distro | (none) | optional dotfiles repo |
+
+You can also set `__VM__<X>` (exported as `<X>` in the user's shell rc) and
+`__VMHOSTS__<ip>` (added to `/etc/hosts`) in `.env` -- see `.env.sample`.
+
+> `.wslconfig` values are **global** to all WSL2 distros; apply with `wsl --shutdown`.
+> The distro boots with **systemd enabled**, so installed services (docker, a
+> GitLab runner, ...) start automatically on boot.
+
+### 2. Bootstrap the distro
+
+`setup.ps1 -wsl` runs this automatically after import. To run it manually
+(inside the distro, as root):
+
+```bash
+sudo bash /mnt/c/Users/<user>/linuxdev/bootstrap-wsl.sh \
+  --noninteractive --envfile /mnt/c/Users/<user>/linuxdev/.env
+```
+
+This installs docker / microk8s / kubectl, oh-my-zsh, creates the default user
+(UID 1000, sudo), sets the hostname, and enables the `linuxdev-boot` systemd unit.
+
+### Read-only rootfs
+
+To survive forced shutdowns without corrupting the ext4 image, system
+directories (`/usr /bin /sbin /lib /lib64 /etc`) are remounted **read-only** on
+every boot by the `linuxdev-boot` systemd unit. To install packages, unlock
+first and re-lock when done:
+
+```bash
+sudo rootfs-rw            # unlock /usr,/etc,...
+sudo apt-get install <pkg>
+sudo rootfs-ro            # re-lock
+```
+
+Writable data lives on **separate rw vhdx volumes** (so rootfs stays read-only):
+
+| volume | mount | default size |
+|--------|-------|--------------|
+| home.vhdx | /home | 20 GB |
+| docker.vhdx | /var/lib/docker | 50 GB |
+| brew.vhdx | /home/linuxbrew | 10 GB |
+
+The vhdx files are **dynamically expanding** (near-zero on disk until used).
+Create/attach them (recommended for a runner host) with:
+
+```powershell
+.\scripts\wsl\setup-disks.ps1 -DistroName Linuxdev
+```
+
+### Minimal install (tools only, no VM backend)
+
+```powershell
+.\setup.ps1 -novm -nodevtools -noconfirm
+```
+
+See the banner printed by `setup.ps1` for the full list of flags
+(`-wsl`, `-vagrant`, `-novm`, `-nodevtools`, `-nogit`, `-vscode`, `-noconfirm`).
+
+### Optional: GitLab Runner (CI)
+
+> Only needed if you want this machine to act as a GitLab CI runner.
+> Skip this if you only need a local dev environment.
+
+After the distro is bootstrapped (docker available), run the optional scripts:
+
+1. Install + register the runner (inside WSL, as root):
+
+   ```bash
+   sudo bash scripts/wsl/install-runner.sh \
+     --url https://gitlab.imaginetoolbox.com \
+     --token <registration-token> \
+     --tags linux,localstack,runner \
+     --autostart
+   ```
+
+   - Installs the `gitlab-runner` binary and registers it with the given tags.
+   - On WSL with systemd enabled (`[boot] systemd=true` in `/etc/wsl.conf`), the
+     runner is installed as a systemd service with `Restart=always`
+     (auto-start on boot + restart on crash). Otherwise it falls back to a
+     `wsl-boot.sh` start hook.
+
+2. Auto-start the distro at Windows logon (admin PowerShell):
+
+   ```powershell
+   .\scripts\wsl\register-autostart.ps1 -DistroName <DistroName>
+   ```
+
+   - Registers a Task Scheduler job that wakes the distro at logon (add
+     `-AtStartup` to also trigger at system boot as SYSTEM), which in turn
+     starts the runner service. Uses built-in Windows cmdlets -- no extra install.
+   - Remove with `-Remove`.
+
 ## Demo
 
 `setup.ps1` (Windows Powershell script; Use setup.sh for Mac)

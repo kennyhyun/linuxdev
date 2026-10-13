@@ -693,3 +693,29 @@ git commit -m "docs: add WSL2 setup instructions to README"
 **Tasks 1–3** are independent of the QEMU build pipeline and can be done now.  
 **Tasks 4–6** depend on Task 4 test results — do in order.  
 **Task 7** last.
+
+
+---
+
+## Update (2026-10-13): systemd + .env-driven config + optional runner
+
+Follow-up work layered on the original 7 tasks. See the design doc's
+Revision History for rationale.
+
+| # | Description | Type |
+|---|---|---|
+| U1 | `config/wsl/wsl.conf` -> `[boot] systemd=true` + `[network] hostname`; new `config/wsl/linuxdev-boot.service` oneshot (mount-disks + rootfs-ro) | Modify + New |
+| U2 | `bootstrap-wsl.sh` -- `--noninteractive`/`--envfile`, install+enable systemd boot unit, user @ UID 1000, oh-my-zsh, hostname (`NAME`), `__VM__` env, `__VMHOSTS__` hosts | Modify |
+| U3 | `scripts/wsl/configure-wslconfig.ps1` -- `.env` -> `%USERPROFILE%\.wslconfig` `[wsl2]` (memory/processors/autoMemoryReclaim/swap) | New |
+| U4 | `setup.ps1` WSL branch -- interactive `.env` collection (WSL_USERNAME/NAME/MEMORY/CPUS/WSL_AUTO_RECLAIM/WSL_SWAP/DOTFILES_REPO), call configure-wslconfig, pass `-envFile` | Modify |
+| U5 | `install-wsl2.ps1` -- `-envFile` param; auto-run `bootstrap-wsl.sh --noninteractive --envfile` after import | Modify |
+| U6 | `scripts/wsl/install-runner.sh` (optional CI runner, systemd service) + `scripts/wsl/register-autostart.ps1` (logon auto-start) | New |
+| U7 | `.env.sample` + README "Setting up with WSL2" section (config table, read-only rootfs rw/ro, separate disks) | New + Docs |
+
+**Notes / caveats:**
+
+- systemd becomes PID 1 only after `wsl --terminate`. During first bootstrap
+  `systemctl enable` may not be possible, so the unit is symlinked into
+  `multi-user.target.wants/` manually as a fallback.
+- `.wslconfig` is global to all WSL2 distros for the Windows user.
+- Read-only rootfs: unlock with `sudo rootfs-rw`, re-lock with `sudo rootfs-ro`.

@@ -169,3 +169,38 @@ mount -o remount,ro / 2>/dev/null || {
 - macOS / QEMU path changes (handled in `feature/qemu-support-for-macos`)
 - Readonly root implementation detail (separate task after Phase 1 test)
 - microk8s setup inside distro (separate task)
+
+---
+
+## Revision History
+
+### 2026-10-13 -- systemd migration + .env-driven config + optional CI runner
+
+Changes to the original (2026-06-18) design:
+
+- **Boot mechanism: `[boot] command` -> `[boot] systemd=true`.**
+  `wsl.conf` now enables systemd so installed Linux services (docker, GitLab
+  runner, ...) auto-start on boot. The readonly-rootfs + disk-mount logic moved
+  from `wsl-boot.sh` (run via `[boot] command`) into a systemd oneshot unit
+  `config/wsl/linuxdev-boot.service` (ordered after `systemd-tmpfiles-setup`).
+  `wsl-boot.sh` is retained only as a non-systemd fallback.
+- **Single interactive entry: `setup.ps1 -wsl`.** It now collects settings
+  interactively and writes `.env`, then drives everything non-interactively.
+  `bootstrap-wsl.sh` gained `--noninteractive` / `--envfile` and is auto-invoked
+  by `install-wsl2.ps1` after distro import (still runnable standalone).
+- **`.env`-driven configuration (two targets):**
+  - Host-global `%USERPROFILE%\.wslconfig` `[wsl2]` (memory/processors/
+    autoMemoryReclaim/swap) via new `scripts/wsl/configure-wslconfig.ps1`.
+  - Distro-side `/etc/wsl.conf` hostname (`NAME`), shell-rc exports (`__VM__*`),
+    and `/etc/hosts` entries (`__VMHOSTS__*`) via `bootstrap-wsl.sh`.
+- **Default user pinned to UID 1000** (`WSL_USERNAME`, default `linuxdev`);
+  frees UID 1000 if held by the distro's default user.
+- **oh-my-zsh** installed for the default user by `bootstrap-wsl.sh`.
+- **Optional GitLab CI runner** (not part of base setup): on-demand
+  `scripts/wsl/install-runner.sh` (systemd service, `Restart=always`) +
+  `scripts/wsl/register-autostart.ps1` (Task Scheduler wakes the distro at
+  logon/startup so systemd services come online).
+- **Separate rw vhdx volumes** (`setup-disks.ps1`) for `/home`,
+  `/var/lib/docker`, `/home/linuxbrew` keep writes off the readonly rootfs.
+
+See the implementation plan's "Update (2026-10)" section for the task breakdown.
