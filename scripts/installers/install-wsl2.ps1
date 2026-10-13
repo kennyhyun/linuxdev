@@ -93,20 +93,35 @@ if (Get-Command gh -ErrorAction SilentlyContinue) {
     }
     Write-Host "GitHub CLI installed"
 }
-
 # =============================================
 # Reboot gate -- must pass before any distro work
 # =============================================
-# WSL features only take effect after a reboot. Verify WSL is actually
-# operational; if a feature was just enabled OR WSL cannot run, stop here with a
-# clear message instead of failing later with WSL_E_DISTRO_NOT_FOUND.
-$wslWorks = $false
-try {
-    wsl --status 2>$null | Out-Null
-    if ($LASTEXITCODE -eq 0) { $wslWorks = $true }
-} catch { $wslWorks = $false }
+# WSL features only take effect after a reboot. 'wsl --status' is NOT reliable:
+# before a reboot it still exits 0 and prints "Default Version", while telling
+# you to enable the optional component. So we check three things:
+#   (a) a feature we just enabled this run ($rebootNeeded)
+#   (b) a Windows "pending reboot" registry flag
+#   (c) wsl --status output asking to enable the component / WSL1 unsupported
 
-if ($rebootNeeded -or -not $wslWorks) {
+function Test-PendingReboot {
+    $keys = @(
+        'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending',
+        'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired'
+    )
+    foreach ($k in $keys) { if (Test-Path $k) { return $true } }
+    $sm = 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager'
+    try {
+        $pfro = (Get-ItemProperty -Path $sm -Name PendingFileRenameOperations -ErrorAction SilentlyContinue).PendingFileRenameOperations
+        if ($pfro) { return $true }
+    } catch {}
+    return $false
+}
+
+$statusText = ""
+try { $statusText = (wsl --status 2>&1 | Out-String) } catch {}
+$statusSaysEnable = $statusText -match 'enable the|optional component|not supported with your current'
+
+if ($rebootNeeded -or (Test-PendingReboot) -or $statusSaysEnable) {
     Write-Host ""
     Write-Host "================================================"
     Write-Host " REBOOT REQUIRED"
