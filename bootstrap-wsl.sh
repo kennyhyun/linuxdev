@@ -191,6 +191,14 @@ fi
 # =============================================
 # Step 4: Create/update default user
 # =============================================
+# IMPORTANT: /home may be a separate vhdx volume. If it exists, mount it BEFORE
+# creating the user, otherwise the home dir would be created on the rootfs and
+# then hidden when the /home volume mounts on next boot (-> chdir failed).
+if [ -f "$SCRIPT_DIR/scripts/wsl/mount-disks.sh" ]; then
+    log "Mounting data disks (if present) before user setup..."
+    bash "$SCRIPT_DIR/scripts/wsl/mount-disks.sh" || log "  (no data disks mounted)"
+fi
+
 if ! id "$USERNAME" &>/dev/null; then
     log "Creating user $USERNAME (UID 1000)..."
     # Free UID 1000 if held by a different (distro default) user
@@ -215,6 +223,17 @@ else
     usermod -aG microk8s "$USERNAME" 2>/dev/null || true
 fi
 
+# Ensure the home directory actually exists (repairs the case where the user
+# record exists but /home was an empty volume at creation time).
+USER_HOME="$(getent passwd "$USERNAME" | cut -d: -f6)"
+[ -n "$USER_HOME" ] || USER_HOME="/home/$USERNAME"
+if [ ! -d "$USER_HOME" ]; then
+    log "Home $USER_HOME missing -- creating from /etc/skel"
+    mkdir -p "$USER_HOME"
+    cp -aT /etc/skel "$USER_HOME" 2>/dev/null || true
+    chown -R "$USERNAME:$USERNAME" "$USER_HOME"
+fi
+
 # Sudoers -- fixed filename, idempotent
 SUDOERS_FILE="/etc/sudoers.d/linuxdev-nopasswd"
 echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > "$SUDOERS_FILE"
@@ -223,7 +242,7 @@ log "Sudo nopasswd configured"
 
 # oh-my-zsh for the default user (idempotent, unattended)
 if [ "$SKIP_PACKAGES" -ne 1 ]; then
-    if [ ! -d "/home/$USERNAME/.oh-my-zsh" ]; then
+    if [ ! -d "$USER_HOME/.oh-my-zsh" ]; then
         log "Installing oh-my-zsh for $USERNAME..."
         su - "$USERNAME" -c 'sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended' \
             || log "WARNING: oh-my-zsh install failed (continuing)"
@@ -304,11 +323,11 @@ done
 # ---- __VM__ env vars -> user's shell rc (export __VM__X as X) ----
 for var in $(compgen -A variable | grep '^__VM__' || true); do
     entry="${var#__VM__}=${!var}"
-    for rc in "/home/$USERNAME/.zshrc" "/home/$USERNAME/.bashrc"; do
+    for rc in "$USER_HOME/.zshrc" "$USER_HOME/.bashrc"; do
         touch "$rc"
         grep -q "export $entry" "$rc" 2>/dev/null || echo "export $entry" >> "$rc"
     done
-    chown "$USERNAME:$USERNAME" "/home/$USERNAME/.zshrc" "/home/$USERNAME/.bashrc" 2>/dev/null || true
+    chown "$USERNAME:$USERNAME" "$USER_HOME/.zshrc" "$USER_HOME/.bashrc" 2>/dev/null || true
     log "env: exported ${var#__VM__}"
 done
 

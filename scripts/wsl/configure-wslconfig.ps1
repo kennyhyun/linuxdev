@@ -33,7 +33,24 @@ $wsl2 = @("[wsl2]")
 if ($envVars.MEMORY) { $wsl2 += "memory=$($envVars.MEMORY)MB" }
 if ($envVars.CPUS)   { $wsl2 += "processors=$($envVars.CPUS)" }
 if ($envVars.WSL_SWAP -and $envVars.WSL_SWAP -ne "0") { $wsl2 += "swap=$($envVars.WSL_SWAP)MB" }
-if ($envVars.WSL_AUTO_RECLAIM) { $wsl2 += "autoMemoryReclaim=$($envVars.WSL_AUTO_RECLAIM)" }
+
+# autoMemoryReclaim requires WSL >= 2.0. Older WSL warns "Unknown key".
+# Detect the installed WSL version and only emit the key when supported.
+if ($envVars.WSL_AUTO_RECLAIM) {
+    $wslVer = $null
+    try {
+        $verText = (wsl --version 2>&1 | Out-String)
+        if ($verText -match 'WSL\D*(\d+)\.(\d+)') {
+            $wslVer = [version]"$($matches[1]).$($matches[2])"
+        }
+    } catch {}
+    if ($wslVer -and $wslVer -ge [version]"2.0") {
+        $wsl2 += "autoMemoryReclaim=$($envVars.WSL_AUTO_RECLAIM)"
+    } else {
+        Write-Host "NOTE: autoMemoryReclaim needs WSL >= 2.0 (detected: $(if($wslVer){$wslVer}else{'<2.0 / unknown'})). Skipping."
+        Write-Host "      Update with 'wsl --update' to enable it."
+    }
+}
 
 $wslconfig = "$env:USERPROFILE\.wslconfig"
 
