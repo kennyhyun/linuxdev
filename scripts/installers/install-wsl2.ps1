@@ -38,6 +38,10 @@ foreach ($feature in $features) {
     $state = (Get-WindowsOptionalFeature -Online -FeatureName $feature -ErrorAction SilentlyContinue).State
     if ($state -eq "Enabled") {
         Write-Host "  $feature already enabled"
+    } elseif ($state -eq "EnablePending") {
+        # Already enabled in a previous run but not yet rebooted.
+        Write-Host "  $feature enabled but pending reboot"
+        $rebootNeeded = $true
     } else {
         Write-Host "  Enabling $feature ..."
         $result = Enable-WindowsOptionalFeature -Online -FeatureName $feature -NoRestart -ErrorAction SilentlyContinue
