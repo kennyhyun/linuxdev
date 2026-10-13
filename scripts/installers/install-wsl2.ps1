@@ -124,46 +124,18 @@ if ($importDistro -or $localImage -or (-not $noConfirm)) {
               else { Read-Host "Enter choice [1]" }
 
     switch ($choice.Trim()) {
-        "2" { & "$PSScriptRoot\..\wsl\install-distro-store.ps1";  $installed = $true }
-        "3" { & "$PSScriptRoot\..\wsl\install-distro-github.ps1"; $installed = $true }
+        "2" { & "$PSScriptRoot\..\wsl\install-distro-store.ps1"  -EnvFile $envFile; $installed = $true }
+        "3" { & "$PSScriptRoot\..\wsl\install-distro-github.ps1" -EnvFile $envFile; $installed = $true }
         "4" {
             $img = if ($localImage) { $localImage } else { Read-Host "Path to .tar or .tar.gz" }
-            & "$PSScriptRoot\..\wsl\install-distro-local.ps1" -ImagePath $img
+            & "$PSScriptRoot\..\wsl\install-distro-local.ps1" -ImagePath $img -EnvFile $envFile
             $installed = $true
         }
         default { Write-Host "Skipped. Run install-distro-*.ps1 later." }
     }
-
-    # --- Auto-bootstrap the distro (non-interactive, driven by .env) ---
-    if ($installed) {
-        $distro = $script:DefaultDistroName   # "Linuxdev"
-
-        # Convert a Windows path (C:\Users\me\x) to a WSL path (/mnt/c/Users/me/x)
-        function ConvertTo-WslPath($winPath) {
-            $full = (Resolve-Path $winPath -ErrorAction SilentlyContinue).Path
-            if (-not $full) { $full = $winPath }
-            if ($full -match '^([A-Za-z]):\\(.*)$') {
-                $drive = $matches[1].ToLower()
-                $rest  = $matches[2] -replace '\\','/'
-                return "/mnt/$drive/$rest"
-            }
-            return ($full -replace '\\','/')
-        }
-
-        $repoRoot = (Resolve-Path "$PSScriptRoot\..\..").Path
-        $repoUnc  = ConvertTo-WslPath $repoRoot
-        $envUnc   = ConvertTo-WslPath $envFile
-
-        Write-Host ""
-        Write-Host "Bootstrapping $distro (non-interactive)..."
-        wsl -d $distro -u root -- bash "$repoUnc/bootstrap-wsl.sh" --noninteractive --envfile "$envUnc"
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warning "bootstrap-wsl.sh exited $LASTEXITCODE. Re-run manually:"
-            Write-Host "  wsl -d $distro -u root -- bash $repoUnc/bootstrap-wsl.sh --noninteractive --envfile $envUnc"
-        }
-        Write-Host ""
-        Write-Host "Apply systemd/boot changes:  wsl --terminate $distro  (then)  wsl -d $distro"
-    }
+    # NOTE: each install-distro-*.ps1 runs post-install.ps1, which waits for the
+    # distro to be ready and then runs bootstrap-wsl.sh (--noninteractive --envfile).
+    # Do not call bootstrap here -- that caused a double-run with the wrong distro name.
 }
 
 # =============================================

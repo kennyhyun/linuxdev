@@ -5,6 +5,7 @@ param(
     [string]$DistroName  = "Linuxdev",
     [string]$DistroDir   = "$env:USERPROFILE\linuxdev\distro",
     [string]$DefaultUser = "linuxdev",
+    [string]$EnvFile     = "$PSScriptRoot\..\..\.env",
     [switch]$SkipPostInstall
 )
 
@@ -56,5 +57,5 @@ if (-not (Test-WslDistroExists $DistroName)) {
 }
 
 if (-not $SkipPostInstall) {
-    & "$PSScriptRoot\post-install.ps1" -DistroName $DistroName -DefaultUser $DefaultUser
+    & "$PSScriptRoot\post-install.ps1" -DistroName $DistroName -DefaultUser $DefaultUser -EnvFile $EnvFile
 }

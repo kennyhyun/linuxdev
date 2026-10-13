@@ -181,19 +181,32 @@ switch ($vmBackend) {
     Write-Host ""
     Write-Host "======= WSL2 Setup ======="
 
-    # --- Interactive .env collection (ask only if empty; save to .env) ---
+    # --- Interactive .env collection ---
+    # Interactive runs re-prompt using any saved value as the default (so a prior
+    # -noconfirm run that filled defaults can still be reviewed). -noconfirm uses
+    # the saved value or the default without prompting. .env is de-duplicated.
     $envPath = "$PSScriptRoot\.env"
+    function Set-EnvValue($key, $value) {
+      $lines = @()
+      if (Test-Path $envPath) { $lines = Get-Content $envPath }
+      $found = $false
+      $lines = $lines | ForEach-Object {
+        if ($_ -match "^\s*$([regex]::Escape($key))\s*=") { $found = $true; "$key=$value" } else { $_ }
+      }
+      if (-not $found) { $lines += "$key=$value" }
+      Set-Content -Path $envPath -Value $lines -Encoding ASCII
+      $envfile[$key] = $value
+    }
     function Get-OrAsk($key, $prompt, $default) {
       $cur = $envfile[$key]
-      if ($cur) { return $cur }
+      $effectiveDefault = if ($cur) { $cur } else { $default }
       if ($noConfirm) {
-        $val = $default
+        $val = $effectiveDefault
       } else {
-        $in = Read-Host "$prompt [$default]"
-        $val = if ([string]::IsNullOrWhiteSpace($in)) { $default } else { $in.Trim() }
+        $in = Read-Host "$prompt [$effectiveDefault]"
+        $val = if ([string]::IsNullOrWhiteSpace($in)) { $effectiveDefault } else { $in.Trim() }
       }
-      Add-Content $envPath "$key=$val"
-      $envfile[$key] = $val
+      Set-EnvValue $key $val
       return $val
     }
     Get-OrAsk "WSL_USERNAME"     "Default Linux username (UID 1000)"                "linuxdev"  | Out-Null
