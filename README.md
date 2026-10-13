@@ -228,6 +228,7 @@ You do **not** run `install-wsl2.ps1` directly -- `setup.ps1 -wsl` invokes it.
 | WSL_SWAP | .wslconfig | 0 | swap (MB), 0 to disable |
 | WSL_USERNAME | distro | linuxdev | default Linux user (created with UID 1000) |
 | NAME | wsl.conf | linuxdev | Linux hostname |
+| WSL_CONTAINER_RUNTIME | distro | docker | docker / microk8s / both / none (kubectl always installed) |
 | DOTFILES_REPO | distro | (none) | optional dotfiles repo |
 
 You can also set `__VM__<X>` (exported as `<X>` in the user's shell rc) and

@@ -157,25 +157,36 @@ if [ "$SKIP_PACKAGES" -ne 1 ]; then
         psmisc
     log "Base packages installed"
 
-    # Docker CE
-    log "Installing docker-ce..."
-    if ! command -v docker &>/dev/null; then
-        bash <(curl -fsSL https://raw.githubusercontent.com/kennyhyun/dotfiles/main/scripts/install_docker.sh)
-        log "docker-ce installed"
-    else
-        log "docker already installed: $(docker --version)"
+    # Container runtime selection (from .env WSL_CONTAINER_RUNTIME):
+    #   docker (default) | microk8s | both | none
+    RUNTIME="${WSL_CONTAINER_RUNTIME:-docker}"
+    log "Container runtime: $RUNTIME"
+
+    case "$RUNTIME" in docker|both)
+        log "Installing docker-ce..."
+        if ! command -v docker &>/dev/null; then
+            bash <(curl -fsSL https://raw.githubusercontent.com/kennyhyun/dotfiles/main/scripts/install_docker.sh)
+            log "docker-ce installed"
+        else
+            log "docker already installed: $(docker --version)"
+        fi
+    ;; esac
+
+    case "$RUNTIME" in microk8s|both)
+        log "Installing microk8s..."
+        if ! command -v microk8s &>/dev/null; then
+            bash <(curl -fsSL https://raw.githubusercontent.com/kennyhyun/dotfiles/main/scripts/install_microk8s.sh)
+            log "microk8s installed"
+        else
+            log "microk8s already installed"
+        fi
+    ;; esac
+
+    if [ "$RUNTIME" = "none" ]; then
+        log "No container runtime installed (WSL_CONTAINER_RUNTIME=none)"
     fi
 
-    # microk8s
-    log "Installing microk8s..."
-    if ! command -v microk8s &>/dev/null; then
-        bash <(curl -fsSL https://raw.githubusercontent.com/kennyhyun/dotfiles/main/scripts/install_microk8s.sh)
-        log "microk8s installed"
-    else
-        log "microk8s already installed"
-    fi
-
-    # kubectl
+    # kubectl -- always installed (useful for remote clusters e.g. EKS too)
     if ! command -v kubectl &>/dev/null; then
         log "Installing kubectl..."
         ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')"
