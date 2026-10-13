@@ -127,23 +127,41 @@ fi
 # Step 2: Register the runner (only if a token was supplied)
 # =============================================
 if [ -n "$TOKEN" ]; then
-    log "Registering runner '$RUNNER_NAME' with $GITLAB_URL (tags: $TAGS)..."
-    gitlab-runner register \
-        --non-interactive \
-        --url "$GITLAB_URL" \
-        --registration-token "$TOKEN" \
-        --executor "$EXECUTOR" \
-        --description "$RUNNER_NAME" \
-        --tag-list "$TAGS" \
-        --locked="false" \
-        --run-untagged="false"
-    log "Runner registered."
+    case "$TOKEN" in
+        glrt-*)
+            # GitLab 16+ runner AUTHENTICATION token. The runner is already
+            # created server-side (type/tags/description set there), so register
+            # only needs --token + executor; tags/locked are ignored here.
+            log "Registering with authentication token (glrt-) at $GITLAB_URL..."
+            gitlab-runner register \
+                --non-interactive \
+                --url "$GITLAB_URL" \
+                --token "$TOKEN" \
+                --executor "$EXECUTOR" \
+                --description "$RUNNER_NAME"
+            log "Runner registered (auth token). Tags come from the server-side runner."
+            ;;
+        *)
+            # Legacy registration token (GitLab < 16).
+            log "Registering with legacy registration token at $GITLAB_URL (tags: $TAGS)..."
+            gitlab-runner register \
+                --non-interactive \
+                --url "$GITLAB_URL" \
+                --registration-token "$TOKEN" \
+                --executor "$EXECUTOR" \
+                --description "$RUNNER_NAME" \
+                --tag-list "$TAGS" \
+                --locked="false" \
+                --run-untagged="false"
+            log "Runner registered (legacy token)."
+            ;;
+    esac
 else
     log "No --token supplied; skipping registration."
-    log "Register later with:"
-    log "  gitlab-runner register --non-interactive --url $GITLAB_URL \\"
-    log "    --registration-token <token> --executor $EXECUTOR \\"
-    log "    --description '$RUNNER_NAME' --tag-list '$TAGS'"
+    log "GitLab 16+: create a runner first (gets a glrt- token), e.g. via API:"
+    log "  POST /user/runners  runner_type=project_type project_id=<id> tag_list=$TAGS"
+    log "Then: gitlab-runner register --non-interactive --url $GITLAB_URL \\"
+    log "        --token glrt-xxxx --executor $EXECUTOR --description '$RUNNER_NAME'"
 fi
 
 # =============================================
