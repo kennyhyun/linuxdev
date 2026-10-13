@@ -173,6 +173,34 @@ if ($importDistro -or $localImage -or (-not $noConfirm)) {
     # NOTE: each install-distro-*.ps1 runs post-install.ps1, which waits for the
     # distro to be ready and then runs bootstrap-wsl.sh (--noninteractive --envfile).
     # Do not call bootstrap here -- that caused a double-run with the wrong distro name.
+
+    # --- Expose WSL docker to Windows (only when a docker runtime was set up) ---
+    if ($installed) {
+        $runtime = "docker"
+        if (Test-Path $envFile) {
+            foreach ($line in Get-Content $envFile) {
+                if ($line -match '^\s*WSL_CONTAINER_RUNTIME\s*=\s*(.+?)\s*$') { $runtime = $matches[1].Trim() }
+            }
+        }
+        if ($runtime -eq "docker" -or $runtime -eq "both") {
+            $distro = $script:DefaultDistroName
+            Write-Host ""
+            Write-Host "----- Docker: exposing WSL daemon to Windows -----"
+            # Convert repo path to WSL mount path
+            $repoRoot = (Resolve-Path "$PSScriptRoot\..\..").Path
+            $repoUnc  = if ($repoRoot -match '^([A-Za-z]):\\(.*)$') { "/mnt/$($matches[1].ToLower())/$($matches[2] -replace '\\','/')" } else { $repoRoot -replace '\\','/' }
+            # 1) Ensure systemd/docker are live, then open localhost TCP inside WSL
+            wsl --terminate $distro 2>$null
+            Start-Sleep -Seconds 2
+            wsl -d $distro -u root -- bash "$repoUnc/scripts/wsl/enable-docker-tcp.sh"
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "enable-docker-tcp.sh failed; skipping Windows docker CLI setup."
+            } else {
+                # 2) Install Windows docker CLI if missing + set DOCKER_HOST
+                & "$PSScriptRoot\..\wsl\setup-docker-host.ps1"
+            }
+        }
+    }
 }
 
 # =============================================
