@@ -67,7 +67,8 @@ $executor = if ($Executor) { $Executor } elseif ($envVars.RUNNER_EXECUTOR) { $en
 $dockerImage = if ($DockerImage) { $DockerImage } elseif ($envVars.RUNNER_DOCKER_IMAGE) { $envVars.RUNNER_DOCKER_IMAGE } else { "" }
 
 # --- verify distro is running/available ---
-$distros = (wsl --list --quiet 2>$null) -replace "`0","" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+. "$PSScriptRoot\..\common\wsl-utils.ps1"
+$distros = @(Get-WslDistros)
 if (-not $DistroName) {
     if ($distros.Count -eq 1) {
         $DistroName = $distros[0]

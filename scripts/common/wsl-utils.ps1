@@ -12,10 +12,25 @@ function Refresh-Path {
 }
 
 function Get-WslDistros {
-    # Returns list of installed distro names (handles UTF-16LE null bytes)
-    return (wsl --list --quiet 2>$null) -replace "`0", "" |
-           Where-Object { $_.Trim() -ne "" } |
-           ForEach-Object { $_.Trim() }
+    # Returns the list of installed distro names.
+    # 'wsl --list --quiet' prints UTF-16LE. Depending on how PowerShell captures
+    # it, the result can arrive as one string full of NUL bytes or as char-split
+    # fragments (which previously yielded a bogus single-letter name like "D").
+    # To be robust: force the console to read wsl's output as Unicode, then clean
+    # each line of NUL/CR and drop blanks.
+    $prev = [Console]::OutputEncoding
+    try { [Console]::OutputEncoding = [System.Text.Encoding]::Unicode } catch {}
+    try {
+        $raw = & wsl.exe --list --quiet 2>$null
+    } finally {
+        try { [Console]::OutputEncoding = $prev } catch {}
+    }
+    # $raw may be an array of lines or a single multi-line string; normalise.
+    $text = ($raw | Out-String)
+    $text = $text -replace "`0", ""        # strip any stray NULs
+    return $text -split "`r?`n" |
+           ForEach-Object { $_.Trim() } |
+           Where-Object { $_ -ne "" }
 }
 
 function Test-WslDistroExists {

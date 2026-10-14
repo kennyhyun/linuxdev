@@ -61,8 +61,9 @@ if ($Remove) {
     return
 }
 
-# Verify the distro exists (wsl --list is UTF-16; normalise)
-$distros = (wsl.exe --list --quiet) -replace "`0", "" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+# Verify the distro exists (robust UTF-16 parse via shared helper)
+. "$PSScriptRoot\..\common\wsl-utils.ps1"
+$distros = @(Get-WslDistros)
 
 # Auto-detect the distro name when not given: if exactly one is installed, use
 # it; otherwise require the caller to pass -DistroName.
