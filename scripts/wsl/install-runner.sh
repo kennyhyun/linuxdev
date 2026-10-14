@@ -88,11 +88,14 @@ require_root
 [ -z "$RUN_USER" ] && RUN_USER="$(current_wsl_user)"
 [ -z "$RUN_USER" ] && RUN_USER="linuxdev"
 
-# linuxdev images boot with a read-only rootfs — unlock for install if the
-# helper is present (installed by bootstrap-wsl.sh).
-if [ "$SKIP_INSTALL" -ne 1 ] && command -v rootfs-rw >/dev/null 2>&1; then
-    log "Unlocking rootfs for install (rootfs-rw)..."
-    rootfs-rw || log "WARNING: rootfs-rw failed; continuing (may already be rw)"
+# linuxdev images boot with a read-only rootfs. Unlock whenever this script may
+# write to ro areas -- not only on binary install: registration writes
+# /etc/gitlab-runner, usermod writes /etc/group, systemd unit install writes
+# /etc/systemd. So unlock unless the helper is absent.
+UNLOCKED=0
+if command -v rootfs-rw >/dev/null 2>&1; then
+    log "Unlocking rootfs (rootfs-rw)..."
+    rootfs-rw && UNLOCKED=1 || log "WARNING: rootfs-rw failed; continuing (may already be rw)"
 fi
 
 # =============================================
@@ -262,8 +265,8 @@ if [ "$AUTOSTART" -eq 1 ]; then
     log "        scripts\\wsl\\register-autostart.ps1 -DistroName <DistroName>"
 fi
 
-# Re-lock rootfs if we unlocked it
-if [ "$SKIP_INSTALL" -ne 1 ] && command -v rootfs-ro >/dev/null 2>&1; then
+# Re-lock rootfs only if we unlocked it in this run.
+if [ "$UNLOCKED" -eq 1 ] && command -v rootfs-ro >/dev/null 2>&1; then
     log "Re-locking rootfs (rootfs-ro)..."
     rootfs-ro || log "WARNING: rootfs-ro partial failure"
 fi
