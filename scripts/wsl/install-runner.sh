@@ -27,7 +27,9 @@
 #   --tags <csv>         Comma-separated tags (default: linux,localstack,runner)
 #   --name <desc>        Runner description (default: wsl2-<hostname>)
 #   --user <name>        User the runner service runs as (default: wsl.conf default user)
-#   --executor <type>    Runner executor (default: shell)
+#   --executor <type>    Runner executor: shell (default) or docker
+#   --docker-image <img> Default image for docker executor (default: whitech/lambda:build-22.11)
+#   --privileged         docker executor: run privileged (only for real DinD)
 #   --runner-version <v> Pin gitlab-runner apt version (default: unset = repo latest)
 #   --autostart          Append a runner-start hook to wsl-boot.sh for auto-start
 #   --skip-install       Skip binary install, only register (binary must exist)
@@ -48,6 +50,9 @@ EXECUTOR="shell"
 RUNNER_VERSION=""
 AUTOSTART=0
 SKIP_INSTALL=0
+# docker executor options (used only when --executor docker)
+DOCKER_IMAGE="whitech/lambda:build-22.11"
+DOCKER_PRIVILEGED=0
 
 log() { echo "[install-runner] $*"; }
 
@@ -73,6 +78,8 @@ while [[ $# -gt 0 ]]; do
         --name)           RUNNER_NAME="$2"; shift 2 ;;
         --user)           RUN_USER="$2"; shift 2 ;;
         --executor)       EXECUTOR="$2"; shift 2 ;;
+        --docker-image)   DOCKER_IMAGE="$2"; shift 2 ;;
+        --privileged)     DOCKER_PRIVILEGED=1; shift ;;
         --runner-version) RUNNER_VERSION="$2"; shift 2 ;;
         --autostart)      AUTOSTART=1; shift ;;
         --skip-install)   SKIP_INSTALL=1; shift ;;
@@ -133,6 +140,24 @@ fi
 # =============================================
 if [ -n "$TOKEN" ]; then
     need_rootfs_write   # registration writes /etc/gitlab-runner/config.toml
+
+    # Build docker-executor registration args (only when --executor docker).
+    # Bind the host (WSL) docker socket so jobs use the distro's docker daemon
+    # directly -- the CI before_script detects /var/run/docker.sock and skips
+    # DinD, so no privileged dind service is needed. Pass --privileged only if
+    # explicitly requested (for real DinD).
+    DOCKER_ARGS=()
+    if [ "$EXECUTOR" = "docker" ]; then
+        DOCKER_ARGS=(
+            --docker-image "$DOCKER_IMAGE"
+            --docker-volumes "/var/run/docker.sock:/var/run/docker.sock"
+            --docker-volumes "/cache"
+            --docker-pull-policy "if-not-present"
+        )
+        [ "$DOCKER_PRIVILEGED" -eq 1 ] && DOCKER_ARGS+=(--docker-privileged)
+        log "docker executor: image=$DOCKER_IMAGE, docker.sock bound, privileged=$DOCKER_PRIVILEGED"
+    fi
+
     case "$TOKEN" in
         glrt-*)
             # GitLab 16+ runner AUTHENTICATION token. The runner is already
@@ -144,7 +169,8 @@ if [ -n "$TOKEN" ]; then
                 --url "$GITLAB_URL" \
                 --token "$TOKEN" \
                 --executor "$EXECUTOR" \
-                --description "$RUNNER_NAME"
+                --description "$RUNNER_NAME" \
+                "${DOCKER_ARGS[@]}"
             log "Runner registered (auth token). Tags come from the server-side runner."
             ;;
         *)
@@ -158,7 +184,8 @@ if [ -n "$TOKEN" ]; then
                 --description "$RUNNER_NAME" \
                 --tag-list "$TAGS" \
                 --locked="false" \
-                --run-untagged="false"
+                --run-untagged="false" \
+                "${DOCKER_ARGS[@]}"
             log "Runner registered (legacy token)."
             ;;
     esac
