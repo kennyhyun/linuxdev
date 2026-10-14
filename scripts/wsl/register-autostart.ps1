@@ -82,14 +82,12 @@ if ($distros -notcontains $DistroName) {
 # console handle is kept (Start-Process -Hidden drops it and the distro dies).
 $dataVhdx   = Join-Path $DiskDir "data.vhdx"
 $dockerVhdx = Join-Path $DiskDir "docker.vhdx"
-$brewVhdx   = Join-Path $DiskDir "brew.vhdx"
 
 $cmd = @"
 @echo off
 rem Linuxdev WSL autostart: attach data disks, then keep the distro alive.
 if exist "$dataVhdx"   wsl --mount --vhd "$dataVhdx" --bare
 if exist "$dockerVhdx" wsl --mount --vhd "$dockerVhdx" --bare
-if exist "$brewVhdx"   wsl --mount --vhd "$brewVhdx" --bare
 wsl --terminate $DistroName
 wsl -d $DistroName -u root -- sleep infinity
 "@

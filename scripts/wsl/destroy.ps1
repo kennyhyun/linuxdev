@@ -61,8 +61,8 @@ Write-Host "Terminating $DistroName..."
 wsl --terminate $DistroName 2>$null
 Start-Sleep -Seconds 2
 
-# Detach disks
-$disks = @("home.vhdx", "docker.vhdx", "brew.vhdx")
+# Detach disks (A1: data + docker; also clean up legacy home/brew if present)
+$disks = @("data.vhdx", "docker.vhdx", "home.vhdx", "brew.vhdx")
 foreach ($disk in $disks) {
     $path = "$DiskDir\$disk"
     if (Test-Path $path) {

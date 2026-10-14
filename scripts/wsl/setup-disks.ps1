@@ -1,212 +1,200 @@
-# Setup additional WSL2 data disks (home, docker, brew)
-# Creates vhdx files, attaches to WSL2, formats, and labels them.
+# setup-disks.ps1 -- set up the A1 WSL2 data layout (data + docker volumes).
+#
+# Layout (2 volumes; /home/linuxbrew lives inside the data volume):
+#   data.vhdx   -> /mnt/data  (bind /mnt/data/var -> /var, /mnt/data/home -> /home)
+#   docker.vhdx -> /var/lib/docker
+#
+# Behaviour:
+#   - If data.vhdx already exists:
+#       * interactive -> ask: use existing / overwrite / abort
+#       * -NoConfirm  -> ERROR and stop (never silently overwrite data)
+#   - Otherwise: create data.vhdx + docker.vhdx (max = *_SIZE_GB), attach, then
+#     run setup-disks.sh which formats, preallocates (*_INIT_GB via fallocate),
+#     and ALWAYS seeds the current rootfs /var + /home into the data volume
+#     (rsync) before emptying the rootfs dirs.
+#
+# Sizes come from .env (DATA_SIZE_GB/DOCKER_SIZE_GB caps, DATA_INIT_GB/
+# DOCKER_INIT_GB preallocation). Defaults: 64 cap, 24/48 init.
 #
 # Usage (Admin PowerShell):
-#   .\scripts\wsl\setup-disks.ps1
-#   .\scripts\wsl\setup-disks.ps1 -DistroName Linuxdev -HomeSizeGB 30 -DockerSizeGB 60
-#   .\scripts\wsl\setup-disks.ps1 -SkipBrew        # no brew disk
-#   .\scripts\wsl\setup-disks.ps1 -AttachOnly      # attach existing vhdx (no format)
-#
-# Disk layout:
-#   home.vhdx   -> /home             label: linuxdev-home
-#   docker.vhdx -> /var/lib/docker   label: linuxdev-docker
-#   brew.vhdx   -> /home/linuxbrew   label: linuxdev-brew
+#   .\scripts\wsl\setup-disks.ps1 -DistroName Debian
+#   .\scripts\wsl\setup-disks.ps1 -DistroName Debian -NoConfirm
+#   .\scripts\wsl\setup-disks.ps1 -DistroName Debian -Force    # overwrite existing
 
 param(
-    [string]$DistroName   = "Linuxdev",
-    [string]$DiskDir      = "$env:USERPROFILE\linuxdev\disks",
-    [int]$HomeSizeGB      = 20,
-    [int]$DockerSizeGB    = 50,
-    [int]$BrewSizeGB      = 10,
-    [switch]$SkipBrew,
-    [switch]$AttachOnly
+    [string]$DistroName = "Debian",
+    [string]$DiskDir    = "$env:USERPROFILE\linuxdev\disks",
+    [string]$EnvFile    = "$env:USERPROFILE\linuxdev\.env",
+    [switch]$Force,
+    [switch]$NoConfirm,
+    [switch]$WhatIf
 )
 
 $ErrorActionPreference = "Stop"
 
-# Create a VHDX file using diskpart (works without Hyper-V module)
-function New-VhdxWithDiskpart {
-    param([string]$Path, [long]$SizeBytes)
-    $sizeMB = [math]::Ceiling($SizeBytes / 1MB)
-    $script = @"
-create vdisk file="$Path" maximum=$sizeMB type=expandable
-"@
-    $tmpScript = "$env:TEMP\linuxdev-create-vhd.txt"
-    $script | Set-Content $tmpScript -Encoding ASCII
-    $result = diskpart /s $tmpScript 2>&1
-    Remove-Item $tmpScript -Force -ErrorAction SilentlyContinue
-    if (-not (Test-Path $Path)) {
-        Write-Error "diskpart failed to create $Path`n$result"
-    }
-}
-
-# Check admin
+# --- admin check ---
 $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     Write-Error "Run as Administrator"
     exit 1
 }
 
-# Check WSL distro exists
-$distros = (wsl --list --quiet 2>$null) -replace "`0", "" | Where-Object { $_ -ne "" }
-if (-not ($distros | Where-Object { $_.Trim() -eq $DistroName })) {
-    Write-Host "Available distros:"
-    $distros | ForEach-Object { Write-Host "  '$_'" }
-    Write-Error "Distro '$DistroName' not found. Run: wsl --list"
-    exit 1
+# --- read a size from .env, default fallback ---
+function Get-EnvSizeGB {
+    param([string]$Key, [int]$Default)
+    if (Test-Path $EnvFile) {
+        foreach ($line in Get-Content $EnvFile) {
+            if ($line -match "^\s*$Key\s*=\s*(\d+)\s*$") { return [int]$matches[1] }
+        }
+    }
+    return $Default
 }
+
+$DataSizeGB   = Get-EnvSizeGB "DATA_SIZE_GB"   64
+$DockerSizeGB = Get-EnvSizeGB "DOCKER_SIZE_GB" 64
+$DataInitGB   = Get-EnvSizeGB "DATA_INIT_GB"   24
+$DockerInitGB = Get-EnvSizeGB "DOCKER_INIT_GB" 48
+if ($DataInitGB   -gt $DataSizeGB)   { $DataInitGB   = $DataSizeGB }
+if ($DockerInitGB -gt $DockerSizeGB) { $DockerInitGB = $DockerSizeGB }
+
+$dataVhdx   = Join-Path $DiskDir "data.vhdx"
+$dockerVhdx = Join-Path $DiskDir "docker.vhdx"
 
 New-Item -ItemType Directory -Force -Path $DiskDir | Out-Null
 
-function Refresh-Path {
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" +
-                [System.Environment]::GetEnvironmentVariable("Path","User")
-}
-
-# Helper: create vhdx if not exists
-function Ensure-Vhdx {
-    param([string]$Path, [int]$SizeGB, [string]$Label)
-    $fileName = [System.IO.Path]::GetFileName($Path)
-    if (Test-Path $Path) {
-        Write-Host "  $fileName already exists - skipping create"
-    } else {
-        $sizeBytes = [long]$SizeGB * 1GB
-        $sizeInfo = $SizeGB.ToString() + "GB dynamic"
-        Write-Host "  Creating $fileName [$sizeInfo]..."
-        if (Get-Module -Name Hyper-V -ListAvailable) {
-            Import-Module Hyper-V -ErrorAction SilentlyContinue
-            New-VHD -Path $Path -SizeBytes $sizeBytes -Dynamic | Out-Null
-        } else {
-            New-VhdxWithDiskpart -Path $Path -SizeBytes $sizeBytes
-        }
-        Write-Host "  Created: $Path"
-    }
-}
-
-# Helper: attach vhdx to WSL, format if needed, mount to path
-function Setup-WslDisk {
-    param(
-        [string]$VhdxPath,
-        [string]$MountPoint,
-        [string]$Label,
-        [bool]$Format
-    )
-
-    $vhdxName = [System.IO.Path]::GetFileName($VhdxPath)
-    Write-Host ""
-    Write-Host "--- $vhdxName -> $MountPoint ---"
-
-    # Attach VHD to WSL (skip if already attached)
-    Write-Host "  Attaching $vhdxName to WSL..."
-    wsl --mount --vhd $VhdxPath --bare 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        # Check if already attached (expected on re-run)
-        $alreadyAttached = wsl -d $DistroName -u root -- bash -c 'lsblk -rno NAME | grep -q sd && echo yes || echo no' 2>$null
-        Write-Host "  NOTE: attach returned error (may already be attached), continuing..."
-    }
-    Start-Sleep -Milliseconds 500
-
-    # Find the new /dev/sdX device inside WSL (freshly attached = no label yet)
-    $devPath = wsl -d $DistroName -u root -- bash -c 'for dev in /dev/sd*; do [ -b "$dev" ] || continue; label=$(blkid -o value -s LABEL "$dev" 2>/dev/null); [ -z "$label" ] && lsblk -no TYPE "$dev" 2>/dev/null | grep -q disk && echo "$dev" && break; done' 2>$null
-
-    if (-not $devPath) {
-        # Already formatted - find by label
-        $devPath = wsl -d $DistroName -- bash -c "blkid -L '$Label' 2>/dev/null || true" 2>$null
-    }
-
-    if (-not $devPath) {
-        Write-Host "  WARNING: Could not find device for $vhdxName - attach manually"
-        return
-    }
-
-    $devPath = $devPath.Trim()
-    Write-Host "  Device: $devPath"
-
-    # Format if requested (first time setup)
-    if ($Format) {
-        Write-Host "  Formatting $devPath as ext4 [label: $Label]..."
-        wsl -d $DistroName -u root -- bash -c "mkfs.ext4 -L '$Label' -F '$devPath'"
-        Write-Host "  Formatted: $devPath"
-    }
-
-    # Mount
-    wsl -d $DistroName -u root -- bash -c "mkdir -p '$MountPoint' && mount '$devPath' '$MountPoint'"
-    Write-Host "  Mounted: $devPath -> $MountPoint"
-    Write-Host "  Done: $vhdxName"
-}
-
-# =============================================
-# Disk definitions
-# =============================================
-$disks = @(
-    @{ File = "home.vhdx";   SizeGB = $HomeSizeGB;   Mount = "/home";            Label = "linuxdev-home" },
-    @{ File = "docker.vhdx"; SizeGB = $DockerSizeGB; Mount = "/var/lib/docker";  Label = "linuxdev-docker" }
-)
-if (-not $SkipBrew) {
-    $disks += @{ File = "brew.vhdx"; SizeGB = $BrewSizeGB; Mount = "/home/linuxbrew"; Label = "linuxdev-brew" }
-}
-
-$modeStr = if ($AttachOnly) { "attach only" } else { "create + format + mount" }
 Write-Host "========================================"
-Write-Host " Linuxdev WSL2 Disk Setup"
+Write-Host " Linuxdev WSL2 disk setup (A1: data + docker)"
 Write-Host " Distro : $DistroName"
 Write-Host " DiskDir: $DiskDir"
-Write-Host " Mode   : $modeStr"
+Write-Host " data   : max=${DataSizeGB}G  init=${DataInitGB}G"
+Write-Host " docker : max=${DockerSizeGB}G  init=${DockerInitGB}G"
+if ($WhatIf) { Write-Host " MODE   : DRY RUN (no changes)" }
 Write-Host "========================================"
 
-# =============================================
-# Create vhdx files
-# =============================================
-if (-not $AttachOnly) {
-    Write-Host ""
-    Write-Host "Creating vhdx files..."
-    foreach ($disk in $disks) {
-        Ensure-Vhdx -Path "$DiskDir\$($disk.File)" -SizeGB $disk.SizeGB -Label $disk.Label
+# =====================================================================
+# Existence guard: never silently clobber existing data volumes.
+# =====================================================================
+if (Test-Path $dataVhdx) {
+    if ($Force) {
+        Write-Host "-Force: discarding existing data.vhdx / docker.vhdx"
+    } elseif ($NoConfirm) {
+        Write-Error "data.vhdx already exists ($dataVhdx) and -NoConfirm was given. Refusing to overwrite. Re-run with -Force to overwrite, or remove the file manually."
+        exit 1
+    } else {
+        Write-Host ""
+        Write-Host "data.vhdx already exists: $dataVhdx"
+        Write-Host "  [U] Use existing disks as-is (do nothing)"
+        Write-Host "  [O] Overwrite (DELETE and recreate -- data on these volumes is lost)"
+        Write-Host "  [A] Abort"
+        $ans = Read-Host "Choose U/O/A"
+        switch ($ans.ToUpper()) {
+            "U" { Write-Host "Using existing disks. Nothing to do."; return }
+            "O" { $Force = $true }
+            default { Write-Host "Aborted."; return }
+        }
+    }
+
+    if ($Force -and -not $WhatIf) {
+        wsl --terminate $DistroName 2>$null
+        Start-Sleep -Seconds 2
+        foreach ($v in @($dataVhdx, $dockerVhdx)) {
+            if (Test-Path $v) {
+                wsl --unmount $v 2>$null | Out-Null
+                Remove-Item -LiteralPath $v -Force
+                Write-Host "   removed: $v"
+            }
+        }
     }
 }
 
-# =============================================
-# Terminate distro, attach disks, restart
-# =============================================
-Write-Host ""
-Write-Host "Terminating $DistroName for clean disk attach..."
-wsl --terminate $DistroName 2>$null
-Start-Sleep -Seconds 2
+function Invoke-Step {
+    param([string]$Desc, [scriptblock]$Action)
+    Write-Host ""
+    Write-Host ">> $Desc"
+    if ($WhatIf) { Write-Host "   (dry run - skipped)"; return }
+    & $Action
+}
 
-Write-Host "Starting $DistroName..."
-$job = Start-Job { wsl -d $args[0] -- sleep 30 } -ArgumentList $DistroName
+# --- diskpart helper to create an empty expandable vhdx ---
+function New-EmptyVhdx {
+    param([string]$Path, [int]$SizeGB)
+    $sizeMB = [long]$SizeGB * 1024
+    $script = "create vdisk file=`"$Path`" maximum=$sizeMB type=expandable"
+    $tmp = "$env:TEMP\linuxdev-disk-create.txt"
+    $script | Set-Content $tmp -Encoding ASCII
+    diskpart /s $tmp | Out-Null
+    Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+    if (-not (Test-Path $Path)) { Write-Error "diskpart failed to create $Path" }
+}
+
+# =====================================================================
+# Step 1: terminate the distro for a clean start
+# =====================================================================
+Invoke-Step "Terminating $DistroName" {
+    wsl --terminate $DistroName 2>$null
+    Start-Sleep -Seconds 2
+}
+
+# =====================================================================
+# Step 2: create empty data/docker vhdx (max cap)
+# =====================================================================
+Invoke-Step "Creating data.vhdx [${DataSizeGB}G]" {
+    New-EmptyVhdx -Path $dataVhdx -SizeGB $DataSizeGB
+    Write-Host "   created: $dataVhdx"
+}
+Invoke-Step "Creating docker.vhdx [${DockerSizeGB}G]" {
+    New-EmptyVhdx -Path $dockerVhdx -SizeGB $DockerSizeGB
+    Write-Host "   created: $dockerVhdx"
+}
+
+if ($WhatIf) {
+    Write-Host ""
+    Write-Host "Dry run complete. Re-run without -WhatIf to apply."
+    return
+}
+
+# =====================================================================
+# Step 3: boot a temp session, attach the new disks, run setup-disks.sh
+# =====================================================================
+Write-Host ""
+Write-Host ">> Formatting + preallocating + seeding inside $DistroName ..."
+
+$job = Start-Job { wsl -d $args[0] -u root -- sleep 600 } -ArgumentList $DistroName
 Start-Sleep -Seconds 3
 
-foreach ($disk in $disks) {
-    $vhdxPath = "$DiskDir\$($disk.File)"
-    $shouldFormat = -not $AttachOnly
-    Setup-WslDisk `
-        -VhdxPath $vhdxPath `
-        -MountPoint $disk.Mount `
-        -Label $disk.Label `
-        -Format $shouldFormat
+foreach ($v in @($dataVhdx, $dockerVhdx)) {
+    if (Test-Path $v) { wsl --mount --vhd $v --bare 2>&1 | Out-Null; Start-Sleep -Milliseconds 500 }
 }
+
+$wslRepo = (wsl -d $DistroName -u root -- bash -c "echo /mnt/c/Users/$env:USERNAME/linuxdev" 2>$null).Trim()
+wsl -d $DistroName -u root -- bash "$wslRepo/scripts/wsl/setup-disks.sh" `
+    --data-label linuxdev-data `
+    --docker-label linuxdev-docker `
+    --data-init-gb $DataInitGB `
+    --docker-init-gb $DockerInitGB
+$rc = $LASTEXITCODE
 
 Stop-Job $job -ErrorAction SilentlyContinue
 Remove-Job $job -ErrorAction SilentlyContinue
 
-# Verify
-Write-Host ""
-Write-Host "Verifying labels..."
-wsl -d $DistroName -u root -- bash -c 'blkid -o list 2>/dev/null | grep linuxdev && echo OK || echo "(none yet)"'
+if ($rc -ne 0) {
+    Write-Error "In-distro setup (setup-disks.sh) failed with code $rc. Review output above."
+    exit 1
+}
+
+# =====================================================================
+# Step 4: terminate so the next boot uses the new .mount units
+# =====================================================================
+wsl --terminate $DistroName 2>$null
 
 Write-Host ""
 Write-Host "========================================"
 Write-Host " Disk setup complete."
 Write-Host ""
-Write-Host " Disks auto-mount on boot via wsl-boot.sh + mount-disks.sh"
-Write-Host " NOTE: wsl --mount must run before WSL starts (see attach-disks.ps1)"
-Write-Host ""
-Write-Host " To attach on Windows startup:"
-foreach ($disk in $disks) {
-    $diskPath = "$DiskDir\$($disk.File)"
-    Write-Host "   wsl --mount --vhd '$diskPath' --bare"
-}
-Write-Host ""
-Write-Host " Or run: .\scripts\wsl\attach-disks.ps1"
+Write-Host " Next:"
+Write-Host "   1. Ensure bootstrap-wsl.sh installed the .mount units and"
+Write-Host "      register-autostart.ps1 attaches the vhdx at logon."
+Write-Host "   2. Reboot Windows (or run the autostart task) and verify:"
+Write-Host "        wsl -d $DistroName -u root -- findmnt /var /home /var/lib/docker"
+Write-Host "      Each should be on a separate device, not the rootfs."
 Write-Host "========================================"

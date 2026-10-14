@@ -11,7 +11,6 @@
 #      bind /mnt/data/var  -> /var
 #      bind /mnt/data/home -> /home
 #   LABEL=linuxdev-docker -> /var/lib/docker
-#   LABEL=linuxdev-brew   -> /home/linuxbrew
 #
 # Idempotent: skips anything already mounted, skips volumes whose label is
 # absent (e.g. before migration has run).
@@ -63,6 +62,3 @@ fi
 
 # 2) docker storage (under /var, so after the /var bind above)
 mount_label "linuxdev-docker" "/var/lib/docker" ""
-
-# 3) brew (under /home, so after the /home bind above)
-mount_label "linuxdev-brew" "/home/linuxbrew" ""

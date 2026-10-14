@@ -12,7 +12,7 @@ param(
     [string]$EnvFile = "$env:USERPROFILE\linuxdev\.env",
     [string]$DiskDir = "$env:USERPROFILE\linuxdev\disks",
     [switch]$SkipDisks,
-    [switch]$SkipBrew
+    [switch]$NoConfirm
 )
 
 . "$PSScriptRoot\..\common\wsl-utils.ps1"
@@ -84,41 +84,23 @@ wsl --terminate $DistroName 2>$null
 Start-Sleep -Seconds 2
 
 # =============================================
-# Step 3: Setup data disks
+# Step 3: Setup data disks (A1: data + docker). This creates the volumes,
+# preallocates, seeds /var + /home onto the data volume, and leaves the next
+# boot to the systemd .mount units.
 # =============================================
 if (-not $SkipDisks) {
     Write-Host ""
-    Write-Host "Setting up data disks..."
-    if ($SkipBrew) {
-        & "$PSScriptRoot\setup-disks.ps1" -DistroName $DistroName -DiskDir $DiskDir -SkipBrew
+    Write-Host "Setting up data disks (A1: data + docker)..."
+    if ($NoConfirm) {
+        & "$PSScriptRoot\setup-disks.ps1" -DistroName $DistroName -DiskDir $DiskDir -EnvFile $EnvFile -NoConfirm
     } else {
-        & "$PSScriptRoot\setup-disks.ps1" -DistroName $DistroName -DiskDir $DiskDir
+        & "$PSScriptRoot\setup-disks.ps1" -DistroName $DistroName -DiskDir $DiskDir -EnvFile $EnvFile
     }
     if ($LASTEXITCODE -ne 0) {
         Write-Host "WARNING: setup-disks.ps1 returned errors - check output above"
     }
 } else {
     Write-Host "Skipping disk setup (-SkipDisks)"
-}
-
-# =============================================
-# Step 4: Format disks (if not already formatted)
-# =============================================
-Write-Host ""
-Write-Host "Formatting unformatted disks (skips already-formatted)..."
-wsl -d $DistroName -u root -- bash "$wslRoot/scripts/wsl/format-disks.sh"
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "WARNING: format-disks.sh returned errors"
-}
-
-# =============================================
-# Step 5: Mount disks inside WSL
-# =============================================
-Write-Host ""
-Write-Host "Mounting disks inside WSL..."
-wsl -d $DistroName -u root -- bash "$wslRoot/scripts/wsl/mount-disks.sh"
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "WARNING: mount-disks.sh returned errors"
 }
 
 # =============================================
@@ -135,7 +117,6 @@ Write-Host " Install dotfiles (inside WSL as $DefaultUser):"
 Write-Host "   git clone https://github.com/kennyhyun/dotfiles.git ~/dotfiles"
 Write-Host "   PRODUCTION=1 bash ~/dotfiles/scripts/linux.sh linuxdev"
 Write-Host ""
-Write-Host " On next Windows boot, attach disks first:"
-Write-Host "   .\scripts\wsl\attach-disks.ps1"
-Write-Host "   wsl -d $DistroName"
+Write-Host " On next Windows boot, the autostart task attaches the vhdx and the"
+Write-Host " systemd .mount units mount /var, /home, /var/lib/docker."
 Write-Host "========================================"
