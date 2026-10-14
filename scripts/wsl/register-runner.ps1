@@ -28,6 +28,10 @@
 #>
 param(
     [string]$DistroName = "Linuxdev",
+    [ValidateSet("shell","docker")]
+    [string]$Executor = "",
+    [string]$DockerImage = "",
+    [switch]$Privileged,
     [switch]$NoAutostart
 )
 $ErrorActionPreference = "Stop"
@@ -58,6 +62,9 @@ $url   = if ($envVars.RUNNER_URL)  { $envVars.RUNNER_URL }  else { "https://gitl
 $tags  = if ($envVars.RUNNER_TAGS) { $envVars.RUNNER_TAGS } else { "linux,localstack,runner" }
 $name  = if ($envVars.RUNNER_NAME) { $envVars.RUNNER_NAME } else { "wsl2-$env:COMPUTERNAME" }
 $user  = $envVars.WSL_USERNAME
+# executor: -Executor param > .env RUNNER_EXECUTOR > install-runner default (shell)
+$executor = if ($Executor) { $Executor } elseif ($envVars.RUNNER_EXECUTOR) { $envVars.RUNNER_EXECUTOR } else { "" }
+$dockerImage = if ($DockerImage) { $DockerImage } elseif ($envVars.RUNNER_DOCKER_IMAGE) { $envVars.RUNNER_DOCKER_IMAGE } else { "" }
 
 # --- verify distro is running/available ---
 $distros = (wsl --list --quiet 2>$null) -replace "`0","" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
@@ -75,13 +82,17 @@ $scriptUnc = ConvertTo-WslPath (Join-Path $repoRoot "scripts\wsl\install-runner.
 
 # --- assemble args (token passed as argument to the in-WSL script, not echoed here) ---
 $argList = @("--url", $url, "--token", $token, "--tags", $tags, "--name", $name)
-if ($user)        { $argList += @("--user", $user) }
+if ($user)             { $argList += @("--user", $user) }
+if ($executor)         { $argList += @("--executor", $executor) }
+if ($dockerImage)      { $argList += @("--docker-image", $dockerImage) }
+if ($Privileged)       { $argList += "--privileged" }
 if (-not $NoAutostart) { $argList += "--autostart" }
 
 Write-Host "Registering runner in '$DistroName'..."
 Write-Host "  url:  $url"
 Write-Host "  tags: $tags"
 Write-Host "  name: $name"
+if ($executor) { Write-Host "  executor: $executor$(if($dockerImage){" (image: $dockerImage)"})" }
 Write-Host "  token: (hidden)"
 
 wsl -d $DistroName -u root -- bash $scriptUnc @argList
