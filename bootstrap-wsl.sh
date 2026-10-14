@@ -186,9 +186,12 @@ if [ "$SKIP_PACKAGES" -ne 1 ]; then
     esac
 
     case "$RUNTIME" in docker|both)
-        log "Installing docker-ce..."
+        log "Installing docker-ce (version: ${_VER_DOCKER:-latest})..."
         if ! command -v docker &>/dev/null; then
-            bash <(curl -fsSL https://raw.githubusercontent.com/kennyhyun/dotfiles/main/scripts/install_docker.sh)
+            # In-repo installer (Docker's official apt repo). _VER_DOCKER is the
+            # same .env key the Vagrant bootstrap uses; empty means latest.
+            # set -e: a failed docker install stops the bootstrap on purpose.
+            bash "$SCRIPT_DIR/scripts/wsl/install-docker.sh" --version "${_VER_DOCKER:-}"
             log "docker-ce installed"
         else
             log "docker already installed: $(docker --version)"
