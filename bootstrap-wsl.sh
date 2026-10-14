@@ -313,6 +313,31 @@ else
     log "systemd not active yet; unit linked to enable on next boot (wsl --terminate)."
 fi
 
+# Install the data-volume .mount units (A1 layout). These mount the data volume
+# at /mnt/data, bind /var and /home from it, and mount the docker volume at
+# /var/lib/docker. They replace the old mount-disks.sh-in-boot-service approach.
+log "Installing data-volume .mount units..."
+MOUNT_UNITS="mnt-data.mount var.mount home.mount var-lib-docker.mount"
+for unit in $MOUNT_UNITS; do
+    cp "$SCRIPT_DIR/config/wsl/$unit" "/etc/systemd/system/$unit"
+done
+if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+    systemctl daemon-reload 2>/dev/null || true
+    for unit in $MOUNT_UNITS; do
+        systemctl enable "$unit" 2>/dev/null \
+            && log "  $unit enabled" \
+            || log "  WARNING: could not enable $unit"
+    done
+else
+    # systemd not PID1 yet: link into local-fs.target.wants manually.
+    mkdir -p /etc/systemd/system/local-fs.target.wants
+    for unit in $MOUNT_UNITS; do
+        ln -sf "/etc/systemd/system/$unit" \
+            "/etc/systemd/system/local-fs.target.wants/$unit"
+    done
+    log "systemd not active yet; .mount units linked to enable on next boot."
+fi
+
 # ---- hostname (/etc/hostname + loopback entry) ----
 log "Setting hostname: $MACHINE_NAME"
 echo "$MACHINE_NAME" > /etc/hostname

@@ -5,7 +5,7 @@
 
 set -e
 
-DIRS=(/usr /bin /sbin /lib /lib64 /etc)
+DIRS=(/usr /bin /sbin /lib /lib64 /etc /opt /srv)
 
 for dir in "${DIRS[@]}"; do
     [ -d "$dir" ] || continue

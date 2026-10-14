@@ -1,0 +1,17 @@
+[Unit]
+Description=Linuxdev docker storage (/var/lib/docker on its own volume)
+# /var/lib/docker lives under /var, so /var (bind) must be up first.
+# docker.service is ordered after local-fs.target, which this unit is part of,
+# so the storage is ready before the daemon starts.
+After=var.mount
+Requires=var.mount
+Before=local-fs.target
+
+[Mount]
+What=LABEL=linuxdev-docker
+Where=/var/lib/docker
+Type=ext4
+Options=defaults
+
+[Install]
+WantedBy=local-fs.target

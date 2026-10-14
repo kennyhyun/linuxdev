@@ -1,19 +1,17 @@
 [Unit]
-Description=Linuxdev WSL boot tasks (mount extra disks, protect rootfs read-only)
+Description=Linuxdev WSL boot tasks (protect rootfs read-only)
 # Run after systemd has finished writing to /etc and /usr so the read-only
 # remount does not race with early boot writes (machine-id, tmpfiles, etc.).
+# Data volumes (/mnt/data, /var, /home, /var/lib/docker) are mounted by
+# dedicated systemd .mount units, not here.
 After=local-fs.target systemd-tmpfiles-setup.service
-# Mount the docker data disk before docker starts.
-Before=docker.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-# Mount extra rw vhdx volumes (/home, /var/lib/docker, /home/linuxbrew) if present.
-ExecStart=/usr/local/lib/linuxdev/mount-disks.sh
-# Make system dirs (/usr /bin /sbin /lib /lib64 /etc) read-only to survive
-# forced shutdowns. Use 'sudo rootfs-rw' to unlock for package installs,
-# then 'sudo rootfs-ro' to re-lock.
+# Make system dirs (/usr /bin /sbin /lib /lib64 /etc /opt /srv) read-only to
+# survive forced shutdowns. Use 'sudo rootfs-rw' to unlock for package
+# installs, then 'sudo rootfs-ro' to re-lock.
 ExecStart=/usr/local/lib/linuxdev/rootfs-ro.sh
 
 [Install]

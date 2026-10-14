@@ -1,0 +1,17 @@
+[Unit]
+Description=Linuxdev /var (bind from data volume)
+DefaultDependencies=no
+After=mnt-data.mount
+Requires=mnt-data.mount
+Before=local-fs.target
+Conflicts=umount.target
+Before=umount.target
+
+[Mount]
+What=/mnt/data/var
+Where=/var
+Type=none
+Options=bind
+
+[Install]
+WantedBy=local-fs.target

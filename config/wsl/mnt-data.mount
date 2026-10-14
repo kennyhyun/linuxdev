@@ -1,0 +1,19 @@
+[Unit]
+Description=Linuxdev data volume (/mnt/data holds var and home subdirs)
+# Mount as early as possible so the bind mounts for /var and /home can be
+# layered on top before the rest of local-fs comes up. WSL2 has no initramfs,
+# so systemd starts on the rootfs /var; keeping rootfs /var empty (done by the
+# migration step) means this late-ish bind is still safe.
+DefaultDependencies=no
+Before=local-fs-pre.target
+Conflicts=umount.target
+Before=umount.target
+
+[Mount]
+What=LABEL=linuxdev-data
+Where=/mnt/data
+Type=ext4
+Options=defaults
+
+[Install]
+WantedBy=local-fs.target

@@ -40,12 +40,15 @@ param(
 
     [string]$TaskName = "LinuxdevWSLKeepAlive",
 
+    [string]$DiskDir = "$env:USERPROFILE\linuxdev\disks",
+
     [switch]$Remove
 )
 
 $ErrorActionPreference = "Stop"
 
 $vbsPath = Join-Path $env:LOCALAPPDATA "linuxdev-wsl-keepalive.vbs"
+$cmdPath = Join-Path $env:LOCALAPPDATA "linuxdev-wsl-keepalive.cmd"
 
 if ($Remove) {
     if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
@@ -55,6 +58,7 @@ if ($Remove) {
         Write-Host "No scheduled task named '$TaskName' found."
     }
     if (Test-Path $vbsPath) { Remove-Item $vbsPath -Force; Write-Host "Removed $vbsPath." }
+    if (Test-Path $cmdPath) { Remove-Item $cmdPath -Force; Write-Host "Removed $cmdPath." }
     return
 }
 
@@ -68,15 +72,38 @@ if ($distros -notcontains $DistroName) {
 # --- 1) Write the VBS keep-alive launcher ---
 # Run(cmd, 0, False): 0 = hidden window (console handle kept alive, unlike
 #   Start-Process -Hidden which drops it), False = don't wait.
-# NOTE: pass "sleep infinity" directly (no 'sh -c') to avoid nested quotes
-#   inside the VBS string, which caused "unexpected end of statement".
-$wslCmd = "wsl.exe -d $DistroName -u root -- sleep infinity"
+# --- 1) Write the launcher: attach disks, terminate, then keep alive (B1) ---
+# wsl --mount needs admin, so it must run in this admin task (not the non-admin
+# Startup VBS). Order matters: attach the vhdx FIRST, then 'wsl --terminate' so
+# the next boot's .mount units see the labelled devices, then 'sleep infinity'
+# to keep the distro (and its systemd services) alive with no console window.
+#
+# A .cmd launcher does the multi-step work; a tiny VBS runs it hidden so the
+# console handle is kept (Start-Process -Hidden drops it and the distro dies).
+$dataVhdx   = Join-Path $DiskDir "data.vhdx"
+$dockerVhdx = Join-Path $DiskDir "docker.vhdx"
+$brewVhdx   = Join-Path $DiskDir "brew.vhdx"
+
+$cmd = @"
+@echo off
+rem Linuxdev WSL autostart: attach data disks, then keep the distro alive.
+if exist "$dataVhdx"   wsl --mount --vhd "$dataVhdx" --bare
+if exist "$dockerVhdx" wsl --mount --vhd "$dockerVhdx" --bare
+if exist "$brewVhdx"   wsl --mount --vhd "$brewVhdx" --bare
+wsl --terminate $DistroName
+wsl -d $DistroName -u root -- sleep infinity
+"@
+Set-Content -Path $cmdPath -Value $cmd -Encoding ASCII
+Write-Host "Wrote attach+keepalive launcher: $cmdPath"
+
+# VBS runs the cmd hidden (window style 0) and keeps the handle (wait = True so
+# the task stays running while 'sleep infinity' holds the distro up).
 $vbs = @"
 Set WshShell = CreateObject("WScript.Shell")
-WshShell.Run "$wslCmd", 0, False
+WshShell.Run "cmd /c """"$cmdPath""""", 0, True
 "@
 Set-Content -Path $vbsPath -Value $vbs -Encoding ASCII
-Write-Host "Wrote keep-alive launcher: $vbsPath"
+Write-Host "Wrote hidden VBS wrapper: $vbsPath"
 
 # --- 2) Register a logon scheduled task that runs the VBS via wscript ---
 $action = New-ScheduledTaskAction -Execute "wscript.exe" -Argument "`"$vbsPath`""
@@ -107,7 +134,7 @@ Register-ScheduledTask -TaskName $TaskName `
 Write-Host "================================================"
 Write-Host " Registered scheduled task '$TaskName'"
 Write-Host "   runs:     wscript.exe $vbsPath"
-Write-Host "   which:    $wslCmd"
+Write-Host "   which:    cmd $cmdPath (attach vhdx -> terminate -> sleep infinity)"
 Write-Host "   runs as:  $currentUser (interactive, at logon)"
 Write-Host ""
 Write-Host " Test now:  Start-ScheduledTask -TaskName $TaskName"
