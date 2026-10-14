@@ -154,6 +154,7 @@ if [ "$SKIP_PACKAGES" -ne 1 ]; then
         apt-transport-https gnupg lsb-release \
         dnsutils iputils-ping net-tools \
         htop tmux jq \
+        rsync \
         psmisc
     log "Base packages installed"
 

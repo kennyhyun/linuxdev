@@ -25,6 +25,7 @@ param(
     [string]$DistroName = "Debian",
     [string]$DiskDir    = "$env:USERPROFILE\linuxdev\disks",
     [string]$EnvFile    = "$env:USERPROFILE\linuxdev\.env",
+    [switch]$Force,
     [switch]$WhatIf
 )
 
@@ -67,8 +68,24 @@ if ($WhatIf) { Write-Host " MODE   : DRY RUN (no changes)" }
 Write-Host "========================================"
 
 if (Test-Path $dataVhdx) {
-    Write-Error "data.vhdx already exists ($dataVhdx). Migration appears done. Aborting."
-    exit 1
+    if ($Force) {
+        # A previous run created the vhdx but failed before formatting/copying.
+        # With -Force we discard the leftover data/docker vhdx and recreate them.
+        # brew.vhdx is NOT touched (it may hold real data from an earlier setup).
+        Write-Host "-Force: removing leftover data.vhdx / docker.vhdx for a clean retry"
+        wsl --terminate $DistroName 2>$null
+        Start-Sleep -Seconds 2
+        foreach ($v in @($dataVhdx, $dockerVhdx)) {
+            if (Test-Path $v) {
+                wsl --unmount $v 2>$null | Out-Null
+                Remove-Item -LiteralPath $v -Force
+                Write-Host "   removed: $v"
+            }
+        }
+    } else {
+        Write-Error "data.vhdx already exists ($dataVhdx). Migration appears done. Re-run with -Force to discard leftover data/docker vhdx and retry."
+        exit 1
+    }
 }
 
 function Invoke-Step {

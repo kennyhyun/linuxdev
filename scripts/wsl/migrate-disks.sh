@@ -41,7 +41,30 @@ done
 
 log() { echo "[migrate-disks] $*"; }
 
-command -v rsync >/dev/null 2>&1 || { log "ERROR: rsync not installed"; exit 1; }
+# copy_tree SRC_DIR DST_DIR [EXCLUDE_REL]
+# Copies the CONTENTS of SRC_DIR into DST_DIR, preserving perms/owners/times.
+# Prefers rsync (handles ACLs/xattrs/hardlinks); falls back to tar (preserves
+# the same metadata and supports an exclude) when rsync is not installed.
+copy_tree() {
+    local src="$1" dst="$2" exclude="${3:-}"
+    if command -v rsync >/dev/null 2>&1; then
+        if [ -n "$exclude" ]; then
+            rsync -aHAX --numeric-ids --delete --exclude="/$exclude" "$src/" "$dst/"
+        else
+            rsync -aHAX --numeric-ids --delete "$src/" "$dst/"
+        fi
+    else
+        # tar fallback: preserves perms/owners/times/hardlinks; no rsync needed.
+        log "  (rsync not found; using tar fallback for $src)"
+        if [ -n "$exclude" ]; then
+            ( cd "$src" && tar --numeric-owner --xattrs --acls \
+                --exclude="./$exclude" -cf - . ) | ( cd "$dst" && tar -xf - )
+        else
+            ( cd "$src" && tar --numeric-owner --xattrs --acls -cf - . ) \
+                | ( cd "$dst" && tar -xf - )
+        fi
+    fi
+}
 
 # The rootfs device (so we never format it).
 ROOT_DEV="$(findmnt -no SOURCE / | sed 's/\[.*//')"
@@ -93,14 +116,12 @@ mount "$DATA_DEV" "$DATA_MNT"
 mkdir -p "$DATA_MNT/var" "$DATA_MNT/home"
 
 log "Copying /var -> data volume (excluding /var/lib/docker)"
-rsync -aHAX --numeric-ids --delete \
-    --exclude='/lib/docker/' \
-    /var/ "$DATA_MNT/var/"
+copy_tree /var "$DATA_MNT/var" "lib/docker"
 # ensure the mountpoint for the docker volume exists on the data volume
 mkdir -p "$DATA_MNT/var/lib/docker"
 
 log "Copying /home -> data volume"
-rsync -aHAX --numeric-ids --delete /home/ "$DATA_MNT/home/"
+copy_tree /home "$DATA_MNT/home"
 
 sync
 umount "$DATA_MNT"
