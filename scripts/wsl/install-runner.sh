@@ -88,15 +88,18 @@ require_root
 [ -z "$RUN_USER" ] && RUN_USER="$(current_wsl_user)"
 [ -z "$RUN_USER" ] && RUN_USER="linuxdev"
 
-# linuxdev images boot with a read-only rootfs. Unlock whenever this script may
-# write to ro areas -- not only on binary install: registration writes
-# /etc/gitlab-runner, usermod writes /etc/group, systemd unit install writes
-# /etc/systemd. So unlock unless the helper is absent.
+# linuxdev images boot with a read-only rootfs. We unlock LAZILY -- only the
+# first time an operation actually needs to write to a ro area (install a
+# package, usermod, create the systemd unit, register). If everything is already
+# in place (idempotent re-run), nothing writes and we never unlock/relock.
 UNLOCKED=0
-if command -v rootfs-rw >/dev/null 2>&1; then
-    log "Unlocking rootfs (rootfs-rw)..."
-    rootfs-rw && UNLOCKED=1 || log "WARNING: rootfs-rw failed; continuing (may already be rw)"
-fi
+need_rootfs_write() {
+    [ "$UNLOCKED" -eq 1 ] && return 0
+    if command -v rootfs-rw >/dev/null 2>&1; then
+        log "Unlocking rootfs (rootfs-rw)..."
+        rootfs-rw && UNLOCKED=1 || log "WARNING: rootfs-rw failed; continuing (may already be rw)"
+    fi
+}
 
 # =============================================
 # Step 1: Install the gitlab-runner binary
@@ -105,6 +108,7 @@ if [ "$SKIP_INSTALL" -ne 1 ]; then
     if command -v gitlab-runner >/dev/null 2>&1; then
         log "gitlab-runner already installed: $(gitlab-runner --version | head -1)"
     else
+        need_rootfs_write
         log "Installing gitlab-runner from official apt repository..."
         curl -fsSL "https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh" | bash
         if [ -n "$RUNNER_VERSION" ]; then
@@ -121,8 +125,6 @@ if [ "$SKIP_INSTALL" -ne 1 ]; then
         log "         runner will fail jobs that build/push docker images."
     else
         log "docker present: $(docker --version)"
-        # Ensure the runner user can talk to the docker daemon
-        usermod -aG docker "$RUN_USER" 2>/dev/null || true
     fi
 fi
 
@@ -130,6 +132,7 @@ fi
 # Step 2: Register the runner (only if a token was supplied)
 # =============================================
 if [ -n "$TOKEN" ]; then
+    need_rootfs_write   # registration writes /etc/gitlab-runner/config.toml
     case "$TOKEN" in
         glrt-*)
             # GitLab 16+ runner AUTHENTICATION token. The runner is already
@@ -181,44 +184,53 @@ if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
     HAS_SYSTEMD=1
 fi
 
-# Ensure the service user's HOME exists and it can use docker. The gitlab-runner
-# apt package creates a 'gitlab-runner' user whose home may be missing (e.g.
-# /home is a separate vhdx volume that was empty at package-install time), which
-# makes the service die with: FATAL chdir /home/<user>: no such file or directory.
-# The runner also needs docker group membership to build/push images.
+# Ensure the service user's HOME exists and it can use docker. Only acts when a
+# change is actually needed (so an idempotent re-run writes nothing and the
+# rootfs is never unlocked). /home may be a separate vhdx volume that was empty
+# at package-install time -> missing home -> service dies with
+# "FATAL chdir /home/<user>: no such file or directory".
 prepare_service_user() {
     local u="$1"
     id "$u" >/dev/null 2>&1 || return 0
     local h; h="$(getent passwd "$u" | cut -d: -f6)"
     [ -n "$h" ] || h="/home/$u"
+    # home dir -- /home is a rw volume, no unlock needed
     if [ ! -d "$h" ]; then
         log "Service user '$u' home '$h' missing -- creating it"
         mkdir -p "$h"
         chown -R "$u:$u" "$h" 2>/dev/null || chown -R "$u" "$h" 2>/dev/null || true
     fi
-    # Grant docker access (no-op if docker/group absent or already a member)
-    usermod -aG docker "$u" 2>/dev/null && log "  '$u' added to docker group" || true
+    # docker group -- only usermod (writes /etc/group, needs unlock) if NOT already a member
+    if id -nG "$u" 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
+        : # already in docker group -- nothing to do
+    elif getent group docker >/dev/null 2>&1; then
+        need_rootfs_write
+        usermod -aG docker "$u" 2>/dev/null && log "  '$u' added to docker group" || true
+    fi
 }
 # Cover both the requested user and the package default 'gitlab-runner'.
 prepare_service_user "$RUN_USER"
 prepare_service_user "gitlab-runner"
 
 if [ "$HAS_SYSTEMD" -eq 1 ]; then
-    log "systemd detected — installing gitlab-runner as a systemd service."
+    log "systemd service (gitlab-runner)..."
     if ! systemctl list-unit-files 2>/dev/null | grep -q '^gitlab-runner\.service'; then
+        need_rootfs_write
         gitlab-runner install --user "$RUN_USER" --working-directory "/home/$RUN_USER" || \
             log "WARNING: gitlab-runner install failed"
     fi
-    # Ensure the unit restarts on failure (unless-stopped equivalent).
-    # gitlab-runner's generated unit already sets Restart=always; enforce via drop-in
-    # so it survives package upgrades.
+    # Restart=always drop-in (write only if missing/different -> avoids needless unlock)
     DROPIN_DIR="/etc/systemd/system/gitlab-runner.service.d"
-    mkdir -p "$DROPIN_DIR"
-    cat > "$DROPIN_DIR/restart.conf" << 'EOF'
-[Service]
+    DROPIN="$DROPIN_DIR/restart.conf"
+    DROPIN_CONTENT="[Service]
 Restart=always
-RestartSec=5
-EOF
+RestartSec=5"
+    if [ ! -f "$DROPIN" ] || [ "$(cat "$DROPIN" 2>/dev/null)" != "$DROPIN_CONTENT" ]; then
+        need_rootfs_write
+        mkdir -p "$DROPIN_DIR"
+        printf '%s\n' "$DROPIN_CONTENT" > "$DROPIN"
+    fi
+    # daemon-reload / enable / restart do NOT write to the ro rootfs
     systemctl daemon-reload 2>/dev/null || true
     systemctl enable gitlab-runner 2>/dev/null || log "NOTE: could not enable unit"
     systemctl restart gitlab-runner 2>/dev/null || log "NOTE: could not start unit now"
@@ -229,6 +241,7 @@ else
     log "then 'wsl --terminate <distro>' and re-run this script."
     log "Falling back to gitlab-runner service installer + wsl-boot hook."
     if ! gitlab-runner status >/dev/null 2>&1; then
+        need_rootfs_write
         gitlab-runner install --user "$RUN_USER" --working-directory "/home/$RUN_USER" 2>/dev/null || \
             log "service install skipped (already installed or unsupported init)"
     fi
