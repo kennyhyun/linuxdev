@@ -178,11 +178,12 @@ if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
     HAS_SYSTEMD=1
 fi
 
-# Ensure the service user's HOME exists. The gitlab-runner apt package creates a
-# 'gitlab-runner' user whose home may be missing (e.g. /home is a separate vhdx
-# volume that was empty at package-install time), which makes the service die
-# with: FATAL chdir /home/<user>: no such file or directory.
-ensure_home() {
+# Ensure the service user's HOME exists and it can use docker. The gitlab-runner
+# apt package creates a 'gitlab-runner' user whose home may be missing (e.g.
+# /home is a separate vhdx volume that was empty at package-install time), which
+# makes the service die with: FATAL chdir /home/<user>: no such file or directory.
+# The runner also needs docker group membership to build/push images.
+prepare_service_user() {
     local u="$1"
     id "$u" >/dev/null 2>&1 || return 0
     local h; h="$(getent passwd "$u" | cut -d: -f6)"
@@ -192,10 +193,12 @@ ensure_home() {
         mkdir -p "$h"
         chown -R "$u:$u" "$h" 2>/dev/null || chown -R "$u" "$h" 2>/dev/null || true
     fi
+    # Grant docker access (no-op if docker/group absent or already a member)
+    usermod -aG docker "$u" 2>/dev/null && log "  '$u' added to docker group" || true
 }
 # Cover both the requested user and the package default 'gitlab-runner'.
-ensure_home "$RUN_USER"
-ensure_home "gitlab-runner"
+prepare_service_user "$RUN_USER"
+prepare_service_user "gitlab-runner"
 
 if [ "$HAS_SYSTEMD" -eq 1 ]; then
     log "systemd detected — installing gitlab-runner as a systemd service."
