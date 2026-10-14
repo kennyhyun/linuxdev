@@ -33,21 +33,29 @@ $features = @(
     "HypervisorPlatform"
 )
 
-$rebootNeeded = $false
+# Only these two are required for WSL2. HypervisorPlatform is optional: it is
+# enabled if possible, but its state never forces a reboot (on some machines it
+# cannot be enabled at all, which used to make every run demand a reboot).
+$requiredFeatures = @("Microsoft-Windows-Subsystem-Linux", "VirtualMachinePlatform")
+
+$rebootNeeded = $false      # a REQUIRED feature is not active yet
+$optionalPending = @()
 foreach ($feature in $features) {
+    $required = $requiredFeatures -contains $feature
     $state = (Get-WindowsOptionalFeature -Online -FeatureName $feature -ErrorAction SilentlyContinue).State
     if ($state -eq "Enabled") {
         Write-Host "  $feature already enabled"
-    } elseif ($state -eq "EnablePending") {
-        # Already enabled in a previous run but not yet rebooted.
-        Write-Host "  $feature enabled but pending reboot"
-        $rebootNeeded = $true
-    } else {
+        continue
+    }
+    if ($state -ne "EnablePending") {
         Write-Host "  Enabling $feature ..."
-        $result = Enable-WindowsOptionalFeature -Online -FeatureName $feature -NoRestart -ErrorAction SilentlyContinue
-        # A feature that was NOT already enabled requires a reboot to take effect.
-        # Do not rely solely on $result.RestartNeeded -- it is unreliable here.
-        $rebootNeeded = $true
+        Enable-WindowsOptionalFeature -Online -FeatureName $feature -NoRestart -ErrorAction SilentlyContinue | Out-Null
+        # Re-read the real state instead of assuming.
+        $state = (Get-WindowsOptionalFeature -Online -FeatureName $feature -ErrorAction SilentlyContinue).State
+    }
+    Write-Host "  $feature state: $state"
+    if ($state -ne "Enabled") {
+        if ($required) { $rebootNeeded = $true } else { $optionalPending += "$feature($state)" }
     }
 }
 
@@ -102,51 +110,41 @@ if (Get-Command gh -ErrorAction SilentlyContinue) {
 # =============================================
 # WSL features only take effect after a reboot. 'wsl --status' is NOT reliable:
 # before a reboot it still exits 0 and prints "Default Version", while telling
-# you to enable the optional component. So we check three things:
-#   (a) a feature we just enabled this run ($rebootNeeded)
-#   (b) a Windows "pending reboot" registry flag
-#   (c) wsl --status output asking to enable the component / WSL1 unsupported
+# you to enable the optional component. The decision below uses the required
+# feature states, the (NUL-stripped) wsl --status text, and an actual distro
+# launch -- see the comment on the signals.
 
-function Test-PendingReboot {
-    # Only consider servicing/update reboot flags. We deliberately do NOT look at
-    # PendingFileRenameOperations: unrelated installers (e.g. the 7-Zip winget
-    # upgrade run just above) set it constantly and it caused false positives.
-    $keys = @(
-        'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending',
-        'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired'
-    )
-    foreach ($k in $keys) { if (Test-Path $k) { return $true } }
-    return $false
-}
-
-# Is WSL actually usable right now? If `wsl` can run a trivial command (or lists
-# distros), the features are active and NO reboot is needed, regardless of any
-# pending-reboot flags. This is the authoritative check.
-function Test-WslOperational {
-    try {
-        $null = wsl.exe --list --quiet 2>$null
-        if ($LASTEXITCODE -ne 0) { return $false }
-    } catch { return $false }
-    # Confirm we can actually launch: run 'true' in the default distro if any
-    # exist; if none exist yet, an operational WSL still returns cleanly above.
-    $distros = (wsl.exe --list --quiet) -replace "`0", "" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-    if (-not $distros) { return $true }   # WSL works; just no distro yet
-    try {
-        wsl.exe -d $distros[0] -- /bin/true 2>$null
-        return ($LASTEXITCODE -eq 0)
-    } catch { return $false }
-}
-
+# Decision signals (all printed so a wrong decision can be diagnosed):
+#   requiredPending : a required feature is not in state "Enabled" (authoritative
+#                     for "needs reboot"; Windows reports EnablePending until reboot)
+#   statusSaysEnable: wsl --status asks to enable the component. Its output is
+#                     UTF-16, so NUL chars are stripped before matching.
+#   distroLaunch    : an installed distro actually starts -> WSL is definitely
+#                     active, which overrides everything else. $null = no distro.
+# Generic Windows pending-reboot flags are ignored on purpose (other installers
+# set them all the time).
 $statusText = ""
-try { $statusText = (wsl --status 2>&1 | Out-String) } catch {}
+try { $statusText = (wsl.exe --status 2>&1 | Out-String) -replace "`0", "" } catch {}
 $statusSaysEnable = $statusText -match 'enable the|optional component|not supported with your current'
 
-$wslOk = Test-WslOperational
+$distroLaunch = $null
+$installedDistros = @()
+try {
+    $installedDistros = @((wsl.exe --list --quiet 2>$null) -replace "`0", "" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+} catch {}
+if ($installedDistros.Count -gt 0) {
+    try { wsl.exe -d $installedDistros[0] -- /bin/true 2>$null; $distroLaunch = ($LASTEXITCODE -eq 0) } catch { $distroLaunch = $false }
+}
 
-# Reboot is required only when WSL is NOT yet operational AND we have a real
-# reason (just enabled a feature this run, a servicing reboot is pending, or
-# wsl itself asks to enable the component). If WSL already works, skip the gate.
-if (-not $wslOk -and ($rebootNeeded -or (Test-PendingReboot) -or $statusSaysEnable)) {
+$launchText = if ($null -eq $distroLaunch) { "n/a(no distro)" } else { "$distroLaunch" }
+Write-Host "  reboot check: requiredPending=$rebootNeeded statusSaysEnable=$statusSaysEnable distroLaunch=$launchText optionalPending=[$($optionalPending -join ',')]"
+
+$needReboot = $false
+if ($distroLaunch -ne $true) {
+    $needReboot = $rebootNeeded -or $statusSaysEnable
+}
+
+if ($needReboot) {
     Write-Host ""
     Write-Host "================================================"
     Write-Host " REBOOT REQUIRED"
@@ -162,11 +160,10 @@ if (-not $wslOk -and ($rebootNeeded -or (Test-PendingReboot) -or $statusSaysEnab
     # Do NOT continue to distro install -- WSL is not usable yet.
     exit 2
 }
-if ($wslOk) {
-    Write-Host "WSL is operational (reboot not needed)."
-} else {
-    Write-Host "WSL is operational."
+if ($optionalPending.Count -gt 0) {
+    Write-Host "  NOTE: optional feature(s) not active: $($optionalPending -join ', ') (not required for WSL2)"
 }
+Write-Host "WSL is operational."
 
 # =============================================
 # Distro install
