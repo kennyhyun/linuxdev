@@ -1,5 +1,5 @@
 #!/bin/bash
-# install-runner.sh — install & register a GitLab Runner inside the WSL2 distro.
+# install-runner.sh - install & register a GitLab Runner inside the WSL2 distro.
 #
 # This is an ON-DEMAND script: it is NOT run by bootstrap-wsl.sh automatically.
 # Run it only on a machine you want to turn into a CI runner.
@@ -200,7 +200,7 @@ fi
 # =============================================
 # Step 3: Install the runner as a service (systemd-first)
 # =============================================
-# Preferred: a systemd unit — it auto-starts on boot AND restarts on crash
+# Preferred: a systemd unit - it auto-starts on boot AND restarts on crash
 # (equivalent to docker's "restart: unless-stopped"). WSL enables systemd via
 # `[boot] systemd=true` in wsl.conf (WSL 0.67.6+).
 # Fallback: gitlab-runner's own service installer + a wsl-boot hook for
@@ -257,9 +257,14 @@ RestartSec=5"
         mkdir -p "$DROPIN_DIR"
         printf '%s\n' "$DROPIN_CONTENT" > "$DROPIN"
     fi
-    # daemon-reload / enable / restart do NOT write to the ro rootfs
+    # daemon-reload and restart do not write to the rootfs, but 'enable' DOES
+    # (it creates a symlink under /etc/systemd/system/*.wants). Unlock only if
+    # the unit is not enabled yet, so an idempotent re-run still writes nothing.
     systemctl daemon-reload 2>/dev/null || true
-    systemctl enable gitlab-runner 2>/dev/null || log "NOTE: could not enable unit"
+    if ! systemctl is-enabled --quiet gitlab-runner 2>/dev/null; then
+        need_rootfs_write
+        systemctl enable gitlab-runner 2>/dev/null || log "NOTE: could not enable unit"
+    fi
     systemctl restart gitlab-runner 2>/dev/null || log "NOTE: could not start unit now"
     log "systemd service enabled (auto-start on boot + Restart=always)."
 else
@@ -276,7 +281,7 @@ else
 fi
 
 # =============================================
-# Step 4: Optional — auto-start on WSL boot (non-systemd fallback)
+# Step 4: Optional - auto-start on WSL boot (non-systemd fallback)
 # =============================================
 # With systemd, enable+Restart already handle boot/crash. The wsl-boot hook is
 # only needed when systemd is unavailable, but we add it harmlessly either way

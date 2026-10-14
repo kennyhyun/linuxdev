@@ -5,6 +5,19 @@
 
 set -e
 
+# On systemd WSL the wsl shell and systemd (PID 1) live in DIFFERENT mount
+# namespaces. A remount here only affects the caller's namespace; package
+# scripts call 'systemctl enable', which systemd executes in ITS namespace, so
+# unlock that one too (otherwise: "Failed to enable unit: Read-only file system").
+if [ -z "${LINUXDEV_IN_PID1_NS:-}" ] && [ -e /proc/1/ns/mnt ] \
+   && [ "$(readlink /proc/self/ns/mnt)" != "$(readlink /proc/1/ns/mnt)" ] \
+   && command -v nsenter >/dev/null 2>&1; then
+    echo "[systemd mount namespace]"
+    LINUXDEV_IN_PID1_NS=1 nsenter -t 1 -m -- bash "$(readlink -f "$0")" \
+        || echo "WARNING: could not unlock systemd mount namespace"
+    echo "[this shell's mount namespace]"
+fi
+
 DIRS=(/usr /bin /sbin /lib /lib64 /etc /opt /srv)
 
 for dir in "${DIRS[@]}"; do

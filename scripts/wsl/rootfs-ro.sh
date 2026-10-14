@@ -5,6 +5,18 @@
 
 set -e
 
+# On systemd WSL the wsl shell and systemd (PID 1) live in DIFFERENT mount
+# namespaces. A remount here only affects the caller's namespace, so also apply
+# it inside PID 1's namespace (where systemd performs e.g. 'systemctl enable').
+if [ -z "${LINUXDEV_IN_PID1_NS:-}" ] && [ -e /proc/1/ns/mnt ] \
+   && [ "$(readlink /proc/self/ns/mnt)" != "$(readlink /proc/1/ns/mnt)" ] \
+   && command -v nsenter >/dev/null 2>&1; then
+    echo "[systemd mount namespace]"
+    LINUXDEV_IN_PID1_NS=1 nsenter -t 1 -m -- bash "$(readlink -f "$0")" \
+        || echo "WARNING: could not lock systemd mount namespace"
+    echo "[this shell's mount namespace]"
+fi
+
 DIRS=(/usr /bin /sbin /lib /lib64 /etc /opt /srv)
 FAILED=()
 
