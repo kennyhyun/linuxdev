@@ -44,6 +44,8 @@ param(
 
     [switch]$AtStartup,
 
+    [int]$DelaySeconds = 30,
+
     [switch]$Remove
 )
 
@@ -73,9 +75,22 @@ $action = New-ScheduledTaskAction -Execute $wslPath `
     -Argument "-d $DistroName -- /bin/true"
 
 $triggers = @()
-$triggers += New-ScheduledTaskTrigger -AtLogOn
-if ($AtStartup) {
-    $triggers += New-ScheduledTaskTrigger -AtStartup
+$logonTrigger = New-ScheduledTaskTrigger -AtLogOn
+$startupTrigger = $null
+if ($AtStartup) { $startupTrigger = New-ScheduledTaskTrigger -AtStartup }
+
+# Right after a COLD boot, WSL/vmms and the vhdx mounts are not ready yet, so a
+# trigger that fires too early wakes the distro but it fails to stabilise
+# (reported success, but STATE=Stopped). A short delay lets WSL warm up.
+# (Verified: manual/warm starts work immediately; only boot-time is affected.)
+if ($DelaySeconds -gt 0) {
+    $iso = "PT${DelaySeconds}S"
+    $logonTrigger.Delay = $iso
+    $triggers += $logonTrigger
+    if ($startupTrigger) { $startupTrigger.Delay = $iso; $triggers += $startupTrigger }
+} else {
+    $triggers += $logonTrigger
+    if ($startupTrigger) { $triggers += $startupTrigger }
 }
 
 # WSL distros are registered PER-USER, so the task MUST run as the interactive
