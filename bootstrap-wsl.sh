@@ -12,7 +12,7 @@
 #   - docker-ce, microk8s, kubectl
 #   - oh-my-zsh for the default user
 #   - default user with UID 1000, sudo NOPASSWD
-#   - hostname (from NAME), __VM__ env vars, __VMHOSTS__ /etc/hosts entries
+#   - hostname (= WSL distro name), __VM__ env vars, __VMHOSTS__ /etc/hosts entries
 #   - systemd enabled + linuxdev-boot.service (mount disks + readonly rootfs)
 #   - rootfs-ro / rootfs-rw toggle commands
 #
@@ -83,6 +83,7 @@ current_wsl_user() {
 # Args
 # =============================================
 USERNAME="${WSL_USERNAME:-}"
+MACHINE_NAME=""
 EXPORT_AFTER=0
 SKIP_PACKAGES=0
 NONINTERACTIVE=0
@@ -91,6 +92,7 @@ ENVFILE=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --user)           USERNAME="$2"; shift 2 ;;
+        --name)           MACHINE_NAME="$2"; shift 2 ;;
         --envfile)        ENVFILE="$2"; shift 2 ;;
         --noninteractive) NONINTERACTIVE=1; shift ;;
         --export)         EXPORT_AFTER=1; shift ;;
@@ -101,14 +103,17 @@ done
 
 require_root
 
-# Load host-collected .env (NAME, DOTFILES_REPO, __VM__*, __VMHOSTS__*)
+# Load host-collected .env (DOTFILES_REPO, __VM__*, __VMHOSTS__*)
 if [ -n "$ENVFILE" ] && [ -f "$ENVFILE" ]; then
     set -a; . "$ENVFILE"; set +a
     log "Loaded env from $ENVFILE"
 fi
 # Username precedence: --user > WSL_USERNAME/.env > default
 USERNAME="${USERNAME:-${WSL_USERNAME:-}}"
-MACHINE_NAME="${NAME:-linuxdev}"
+# Hostname == WSL distro name (unified). Precedence: --name > current hostname.
+# There is no separate .env NAME any more.
+MACHINE_NAME="${MACHINE_NAME:-$(hostname 2>/dev/null)}"
+MACHINE_NAME="${MACHINE_NAME:-linuxdev}"
 
 # =============================================
 # Step 1: Determine username

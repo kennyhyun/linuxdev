@@ -227,7 +227,7 @@ You do **not** run `install-wsl2.ps1` directly -- `setup.ps1 -wsl` invokes it.
 | WSL_AUTO_RECLAIM | .wslconfig | gradual | memory auto-reclaim (gradual/dropcache/disabled) |
 | WSL_SWAP | .wslconfig | 0 | swap (MB), 0 to disable |
 | WSL_USERNAME | distro | linuxdev | default Linux user (created with UID 1000) |
-| NAME | wsl.conf | linuxdev | Linux hostname |
+| (hostname) | wsl.conf | = distro name | the Linux hostname follows the WSL distro name (not configurable separately) |
 | WSL_CONTAINER_RUNTIME | distro | docker | docker / microk8s / both / none (kubectl always installed) |
 | DOTFILES_REPO | distro | (none) | optional dotfiles repo |
 

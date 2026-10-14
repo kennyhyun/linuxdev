@@ -34,7 +34,7 @@ If ($args.Contains("-importdistro")) {
   $importDistro = 1
 }
 
-# Legacy flags — keep for backward compat
+# Legacy flags - keep for backward compat
 If ($args.Contains("-novagrant")) {
   $noVagrant = 1
 }
@@ -198,7 +198,6 @@ switch ($vmBackend) {
       return $val
     }
     Get-OrAsk "WSL_USERNAME"     "Default Linux username (UID 1000)"                "linuxdev"  | Out-Null
-    Get-OrAsk "NAME"             "Linux hostname"                                   "linuxdev"  | Out-Null
     Get-OrAsk "WSL_CONTAINER_RUNTIME" "Container runtime (docker/microk8s/both/none)" "docker"   | Out-Null
     Get-OrAsk "MEMORY"           "WSL2 memory limit in MB (global)"                 "4096"      | Out-Null
     Get-OrAsk "CPUS"             "WSL2 CPU count (global)"                          "4"         | Out-Null

@@ -70,7 +70,7 @@ Write-Host ""
 Write-Host "Running bootstrap-wsl.sh inside WSL..."
 Write-Host "  (installs packages, creates user '$DefaultUser' @ UID 1000, systemd, rootfs-ro)"
 
-wsl -d $DistroName -u root -- bash "$wslRoot/bootstrap-wsl.sh" --noninteractive --envfile "$envUnc" --user $DefaultUser
+wsl -d $DistroName -u root -- bash "$wslRoot/bootstrap-wsl.sh" --noninteractive --envfile "$envUnc" --user $DefaultUser --name $DistroName
 if ($LASTEXITCODE -ne 0) {
     Write-Host "WARNING: bootstrap-wsl.sh returned $LASTEXITCODE - check output above"
 }

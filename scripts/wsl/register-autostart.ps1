@@ -35,8 +35,7 @@
     .\register-autostart.ps1 -DistroName Debian -Remove
 #>
 param(
-    [Parameter(Mandatory = $true)]
-    [string]$DistroName,
+    [string]$DistroName = "",
 
     [string]$TaskName = "LinuxdevWSLKeepAlive",
 
@@ -64,7 +63,21 @@ if ($Remove) {
 
 # Verify the distro exists (wsl --list is UTF-16; normalise)
 $distros = (wsl.exe --list --quiet) -replace "`0", "" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-if ($distros -notcontains $DistroName) {
+
+# Auto-detect the distro name when not given: if exactly one is installed, use
+# it; otherwise require the caller to pass -DistroName.
+if (-not $DistroName) {
+    if ($distros.Count -eq 1) {
+        $DistroName = $distros[0]
+        Write-Host "Auto-detected distro: $DistroName"
+    } elseif ($distros.Count -eq 0) {
+        Write-Error "No WSL distro installed. Install one first, or pass -DistroName."
+        exit 1
+    } else {
+        Write-Error "Multiple distros installed ($($distros -join ', ')). Pass -DistroName <name>."
+        exit 1
+    }
+} elseif ($distros -notcontains $DistroName) {
     Write-Warning "Distro '$DistroName' not found in: $($distros -join ', ')"
     Write-Warning "Registering anyway (no-op until the distro exists)."
 }

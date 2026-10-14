@@ -161,12 +161,12 @@ if ($importDistro -or $localImage -or (-not $noConfirm)) {
               else { Read-Host "Enter choice [1]" }
 
     switch ($choice.Trim()) {
-        "2" { & "$PSScriptRoot\..\wsl\install-distro-store.ps1"  -EnvFile $envFile; $installed = $true }
-        "3" { & "$PSScriptRoot\..\wsl\install-distro-github.ps1" -EnvFile $envFile; $installed = $true }
+        "2" { & "$PSScriptRoot\..\wsl\install-distro-store.ps1"  -EnvFile $envFile; $installed = $true; $installedDistro = "Debian" }
+        "3" { & "$PSScriptRoot\..\wsl\install-distro-github.ps1" -EnvFile $envFile; $installed = $true; $installedDistro = "Linuxdev" }
         "4" {
             $img = if ($localImage) { $localImage } else { Read-Host "Path to .tar or .tar.gz" }
             & "$PSScriptRoot\..\wsl\install-distro-local.ps1" -ImagePath $img -EnvFile $envFile
-            $installed = $true
+            $installed = $true; $installedDistro = "Linuxdev"
         }
         default { Write-Host "Skipped. Run install-distro-*.ps1 later." }
     }
@@ -183,7 +183,7 @@ if ($importDistro -or $localImage -or (-not $noConfirm)) {
             }
         }
         if ($runtime -eq "docker" -or $runtime -eq "both") {
-            $distro = $script:DefaultDistroName
+            $distro = if ($installedDistro) { $installedDistro } else { $script:DefaultDistroName }
             Write-Host ""
             Write-Host "----- Docker: exposing WSL daemon to Windows -----"
             # Convert repo path to WSL mount path
