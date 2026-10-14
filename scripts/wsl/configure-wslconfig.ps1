@@ -37,15 +37,10 @@ if ($envVars.MEMORY) { $wsl2 += "memory=$($envVars.MEMORY)MB" }
 if ($envVars.CPUS)   { $wsl2 += "processors=$($envVars.CPUS)" }
 if ($envVars.WSL_SWAP -and $envVars.WSL_SWAP -ne "0") { $wsl2 += "swap=$($envVars.WSL_SWAP)MB" }
 
-# Keep the distro running without an open session (required for a runner host:
-# WSL otherwise shuts the distro down a few seconds after the last session
-# closes). WSL 2.0+ uses instanceIdleTimeout; older builds use vmIdleTimeout.
-# Both are emitted; an unknown key is only warned about, a known one applies.
-# Set WSL_KEEP_ALIVE=0 in .env to disable.
-if (-not $envVars.WSL_KEEP_ALIVE -or $envVars.WSL_KEEP_ALIVE -ne "0") {
-    $wsl2 += "vmIdleTimeout=-1"
-    $wsl2 += "instanceIdleTimeout=-1"
-}
+# NOTE: keeping the distro alive is handled by scripts/wsl/register-autostart.ps1
+# (a hidden VBS 'sleep infinity' session), NOT by vmIdleTimeout/instanceIdleTimeout.
+# Those keys are ignored on several WSL builds (e.g. 3.0.3 warns "Unknown key"),
+# so they are intentionally NOT written here.
 
 # --- build [experimental] section ---
 $experimental = @()

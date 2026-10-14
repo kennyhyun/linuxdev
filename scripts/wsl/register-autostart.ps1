@@ -1,55 +1,51 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Register a Windows Task Scheduler job that wakes the WSL2 distro at logon/boot,
-    so the GitLab Runner inside it comes online automatically.
+    Keep a WSL2 distro running in the background (no console window) at logon,
+    so its systemd services (GitLab Runner, sshd, docker) stay available.
 
 .DESCRIPTION
-    WSL2 shuts a distro down when it has no running sessions. The runner's
-    systemd service (installed by install-runner.sh) only starts once the distro
-    is running. This task starts the distro at user logon (and optionally system
-    startup), which triggers systemd, which starts the runner.
+    WSL2 shuts a distro down shortly after the LAST session with an active
+    console handle closes -- internal systemd daemons alone do NOT keep it up,
+    and vmIdleTimeout/instanceIdleTimeout are ignored on some WSL builds.
 
-    The task runs:  wsl.exe -d <DistroName> -- /bin/true
-    which boots the distro (firing wsl.conf [boot] + systemd) without opening a shell.
+    The reliable fix (per WSL issue #1511 and community guides) is to launch a
+    PERSISTENT session (`sleep infinity`) that stays attached. A plain
+    Start-Process -WindowStyle Hidden drops the console handle and the distro
+    still dies; a VBS `WshShell.Run(cmd, 0, False)` hides the window but KEEPS
+    the console handle, so the distro stays alive with no visible window.
+
+    This script:
+      1. Writes a VBS launcher (sleep infinity in the distro) to %LOCALAPPDATA%.
+      2. Registers a logon scheduled task that runs it via wscript.exe.
+    systemd (enabled in the distro) then auto-starts the runner/sshd/docker.
 
 .PARAMETER DistroName
-    Name of the WSL distro to wake (e.g. "Linuxdev"). Required.
+    WSL distro name (e.g. "Debian", "Linuxdev"). Required.
 
 .PARAMETER TaskName
-    Scheduler task name. Default: "LinuxdevWSLRunnerAutostart".
-
-.PARAMETER AtStartup
-    Also trigger at system startup (runs as SYSTEM, before any user logs on).
-    Useful for an always-on runner host. Requires the distro to be usable
-    without a logged-in user.
+    Scheduled task name. Default: "LinuxdevWSLKeepAlive".
 
 .PARAMETER Remove
-    Remove the scheduled task instead of creating it.
+    Remove the task and the VBS launcher.
 
 .EXAMPLE
-    .\register-autostart.ps1 -DistroName Linuxdev
-
+    .\register-autostart.ps1 -DistroName Debian
 .EXAMPLE
-    .\register-autostart.ps1 -DistroName Linuxdev -AtStartup
-
-.EXAMPLE
-    .\register-autostart.ps1 -DistroName Linuxdev -Remove
+    .\register-autostart.ps1 -DistroName Debian -Remove
 #>
 param(
     [Parameter(Mandatory = $true)]
     [string]$DistroName,
 
-    [string]$TaskName = "LinuxdevWSLRunnerAutostart",
-
-    [switch]$AtStartup,
-
-    [int]$DelaySeconds = 30,
+    [string]$TaskName = "LinuxdevWSLKeepAlive",
 
     [switch]$Remove
 )
 
 $ErrorActionPreference = "Stop"
+
+$vbsPath = Join-Path $env:LOCALAPPDATA "linuxdev-wsl-keepalive.vbs"
 
 if ($Remove) {
     if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
@@ -58,6 +54,7 @@ if ($Remove) {
     } else {
         Write-Host "No scheduled task named '$TaskName' found."
     }
+    if (Test-Path $vbsPath) { Remove-Item $vbsPath -Force; Write-Host "Removed $vbsPath." }
     return
 }
 
@@ -65,46 +62,34 @@ if ($Remove) {
 $distros = (wsl.exe --list --quiet) -replace "`0", "" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
 if ($distros -notcontains $DistroName) {
     Write-Warning "Distro '$DistroName' not found in: $($distros -join ', ')"
-    Write-Warning "Register anyway (it will no-op until the distro exists)."
+    Write-Warning "Registering anyway (no-op until the distro exists)."
 }
 
-# The action: boot the distro quietly. /bin/true returns immediately but the
-# distro stays up (systemd keeps running) and the runner service starts.
-$wslPath = "$env:SystemRoot\System32\wsl.exe"
-$action = New-ScheduledTaskAction -Execute $wslPath `
-    -Argument "-d $DistroName -- /bin/true"
+# --- 1) Write the VBS keep-alive launcher ---
+# Run(cmd, 0, False): 0 = hidden window (but console handle kept alive),
+#                     False = don't wait. 'exec sleep infinity' never returns,
+# so the session persists and WSL keeps the distro running.
+$wslCmd = "wsl.exe -d $DistroName -u root -- /bin/sh -c ""exec sleep infinity"""
+$vbs = @"
+Set WshShell = CreateObject("WScript.Shell")
+WshShell.Run "$wslCmd", 0, False
+"@
+Set-Content -Path $vbsPath -Value $vbs -Encoding ASCII
+Write-Host "Wrote keep-alive launcher: $vbsPath"
 
-$triggers = @()
-$logonTrigger = New-ScheduledTaskTrigger -AtLogOn
-$startupTrigger = $null
-if ($AtStartup) { $startupTrigger = New-ScheduledTaskTrigger -AtStartup }
+# --- 2) Register a logon scheduled task that runs the VBS via wscript ---
+$action = New-ScheduledTaskAction -Execute "wscript.exe" -Argument "`"$vbsPath`""
+$trigger = New-ScheduledTaskTrigger -AtLogOn
 
-# Right after a COLD boot, WSL/vmms and the vhdx mounts are not ready yet, so a
-# trigger that fires too early wakes the distro but it fails to stabilise
-# (reported success, but STATE=Stopped). A short delay lets WSL warm up.
-# (Verified: manual/warm starts work immediately; only boot-time is affected.)
-if ($DelaySeconds -gt 0) {
-    $iso = "PT${DelaySeconds}S"
-    $logonTrigger.Delay = $iso
-    $triggers += $logonTrigger
-    if ($startupTrigger) { $startupTrigger.Delay = $iso; $triggers += $startupTrigger }
-} else {
-    $triggers += $logonTrigger
-    if ($startupTrigger) { $triggers += $startupTrigger }
-}
-
-# WSL distros are registered PER-USER, so the task MUST run as the interactive
-# user -- SYSTEM cannot see or start the distro. (Running as SYSTEM fails with
-# LastTaskResult=0xFFFFFFFF and the distro stays Stopped.)
+# Per-user WSL -> run as the interactive user (NOT SYSTEM; SYSTEM cannot see the distro).
 $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-$principal = New-ScheduledTaskPrincipal -UserId $currentUser `
-    -LogonType Interactive -RunLevel Highest
+$principal = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive -RunLevel Highest
 
 $settings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries `
     -StartWhenAvailable `
-    -ExecutionTimeLimit (New-TimeSpan -Minutes 5)
+    -ExecutionTimeLimit (New-TimeSpan -Seconds 0)   # 0 = no limit (persistent)
 
 if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
     Write-Host "Task '$TaskName' already exists - updating it."
@@ -113,27 +98,19 @@ if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
 
 Register-ScheduledTask -TaskName $TaskName `
     -Action $action `
-    -Trigger $triggers `
+    -Trigger $trigger `
     -Principal $principal `
     -Settings $settings `
-    -Description "Wake WSL distro '$DistroName' at logon so the GitLab Runner service starts." | Out-Null
-
-$triggerLabel = "logon"
-if ($AtStartup) { $triggerLabel = "logon + startup" }
+    -Description "Keep WSL distro '$DistroName' alive (hidden) so its services stay up." | Out-Null
 
 Write-Host "================================================"
 Write-Host " Registered scheduled task '$TaskName'"
-Write-Host "   action:   wsl.exe -d $DistroName -- /bin/true"
-Write-Host "   runs as:  $currentUser (interactive)"
-Write-Host "   triggers: $triggerLabel"
-if ($AtStartup) {
-    Write-Host ""
-    Write-Host " NOTE: WSL needs a user context, so this task runs as $currentUser."
-    Write-Host "       The 'startup' trigger only fires once that user is logged on."
-    Write-Host "       For a headless runner host, enable Windows auto-logon."
-}
+Write-Host "   runs:     wscript.exe $vbsPath"
+Write-Host "   which:    $wslCmd"
+Write-Host "   runs as:  $currentUser (interactive, at logon)"
 Write-Host ""
 Write-Host " Test now:  Start-ScheduledTask -TaskName $TaskName"
-Write-Host " Verify:    wsl.exe -d $DistroName -- gitlab-runner status"
+Write-Host "            Start-Sleep 10; wsl -l --running"
+Write-Host " Verify:    wsl -d $DistroName -- systemctl is-active gitlab-runner"
 Write-Host " Remove:    .\scripts\wsl\register-autostart.ps1 -DistroName $DistroName -Remove"
 Write-Host "================================================"
