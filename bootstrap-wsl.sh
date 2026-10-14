@@ -114,7 +114,10 @@ require_root
 
 # Load host-collected .env (DOTFILES_REPO, __VM__*, __VMHOSTS__*)
 if [ -n "$ENVFILE" ] && [ -f "$ENVFILE" ]; then
-    set -a; . "$ENVFILE"; set +a
+    # .env is written on Windows (CRLF). Strip CR, otherwise every value gets a
+    # trailing '\r' (e.g. WSL_CONTAINER_RUNTIME="docker\r" never matches 'docker'
+    # and docker is silently not installed).
+    set -a; . <(tr -d '\r' < "$ENVFILE"); set +a
     log "Loaded env from $ENVFILE"
 fi
 # Username precedence: --user > WSL_USERNAME/.env > default
@@ -175,7 +178,12 @@ if [ "$SKIP_PACKAGES" -ne 1 ]; then
     # Container runtime selection (from .env WSL_CONTAINER_RUNTIME):
     #   docker (default) | microk8s | both | none
     RUNTIME="${WSL_CONTAINER_RUNTIME:-docker}"
+    RUNTIME="$(printf '%s' "$RUNTIME" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
     log "Container runtime: $RUNTIME"
+    case "$RUNTIME" in
+        docker|microk8s|both|none) : ;;
+        *) log "WARNING: unknown WSL_CONTAINER_RUNTIME='$RUNTIME' - no container runtime installed" ;;
+    esac
 
     case "$RUNTIME" in docker|both)
         log "Installing docker-ce..."
