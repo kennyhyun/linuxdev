@@ -78,15 +78,12 @@ if ($AtStartup) {
     $triggers += New-ScheduledTaskTrigger -AtStartup
 }
 
-# Run with highest privileges. At logon use the interactive user; at startup
-# fall back to SYSTEM so it fires before anyone logs in.
-if ($AtStartup) {
-    $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" `
-        -LogonType ServiceAccount -RunLevel Highest
-} else {
-    $principal = New-ScheduledTaskPrincipal -UserId ([System.Security.Principal.WindowsIdentity]::GetCurrent().Name) `
-        -LogonType Interactive -RunLevel Highest
-}
+# WSL distros are registered PER-USER, so the task MUST run as the interactive
+# user -- SYSTEM cannot see or start the distro. (Running as SYSTEM fails with
+# LastTaskResult=0xFFFFFFFF and the distro stays Stopped.)
+$currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+$principal = New-ScheduledTaskPrincipal -UserId $currentUser `
+    -LogonType Interactive -RunLevel Highest
 
 $settings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
@@ -107,14 +104,21 @@ Register-ScheduledTask -TaskName $TaskName `
     -Description "Wake WSL distro '$DistroName' at logon so the GitLab Runner service starts." | Out-Null
 
 $triggerLabel = "logon"
-if ($AtStartup) { $triggerLabel = "logon + startup (SYSTEM)" }
+if ($AtStartup) { $triggerLabel = "logon + startup" }
 
 Write-Host "================================================"
 Write-Host " Registered scheduled task '$TaskName'"
 Write-Host "   action:   wsl.exe -d $DistroName -- /bin/true"
+Write-Host "   runs as:  $currentUser (interactive)"
 Write-Host "   triggers: $triggerLabel"
+if ($AtStartup) {
+    Write-Host ""
+    Write-Host " NOTE: WSL needs a user context, so this task runs as $currentUser."
+    Write-Host "       The 'startup' trigger only fires once that user is logged on."
+    Write-Host "       For a headless runner host, enable Windows auto-logon."
+}
 Write-Host ""
 Write-Host " Test now:  Start-ScheduledTask -TaskName $TaskName"
 Write-Host " Verify:    wsl.exe -d $DistroName -- gitlab-runner status"
-Write-Host " Remove:    .\register-autostart.ps1 -DistroName $DistroName -Remove"
+Write-Host " Remove:    .\scripts\wsl\register-autostart.ps1 -DistroName $DistroName -Remove"
 Write-Host "================================================"
