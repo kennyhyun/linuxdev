@@ -108,24 +108,45 @@ if (Get-Command gh -ErrorAction SilentlyContinue) {
 #   (c) wsl --status output asking to enable the component / WSL1 unsupported
 
 function Test-PendingReboot {
+    # Only consider servicing/update reboot flags. We deliberately do NOT look at
+    # PendingFileRenameOperations: unrelated installers (e.g. the 7-Zip winget
+    # upgrade run just above) set it constantly and it caused false positives.
     $keys = @(
         'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending',
         'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired'
     )
     foreach ($k in $keys) { if (Test-Path $k) { return $true } }
-    $sm = 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager'
-    try {
-        $pfro = (Get-ItemProperty -Path $sm -Name PendingFileRenameOperations -ErrorAction SilentlyContinue).PendingFileRenameOperations
-        if ($pfro) { return $true }
-    } catch {}
     return $false
+}
+
+# Is WSL actually usable right now? If `wsl` can run a trivial command (or lists
+# distros), the features are active and NO reboot is needed, regardless of any
+# pending-reboot flags. This is the authoritative check.
+function Test-WslOperational {
+    try {
+        $null = wsl.exe --list --quiet 2>$null
+        if ($LASTEXITCODE -ne 0) { return $false }
+    } catch { return $false }
+    # Confirm we can actually launch: run 'true' in the default distro if any
+    # exist; if none exist yet, an operational WSL still returns cleanly above.
+    $distros = (wsl.exe --list --quiet) -replace "`0", "" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+    if (-not $distros) { return $true }   # WSL works; just no distro yet
+    try {
+        wsl.exe -d $distros[0] -- /bin/true 2>$null
+        return ($LASTEXITCODE -eq 0)
+    } catch { return $false }
 }
 
 $statusText = ""
 try { $statusText = (wsl --status 2>&1 | Out-String) } catch {}
 $statusSaysEnable = $statusText -match 'enable the|optional component|not supported with your current'
 
-if ($rebootNeeded -or (Test-PendingReboot) -or $statusSaysEnable) {
+$wslOk = Test-WslOperational
+
+# Reboot is required only when WSL is NOT yet operational AND we have a real
+# reason (just enabled a feature this run, a servicing reboot is pending, or
+# wsl itself asks to enable the component). If WSL already works, skip the gate.
+if (-not $wslOk -and ($rebootNeeded -or (Test-PendingReboot) -or $statusSaysEnable)) {
     Write-Host ""
     Write-Host "================================================"
     Write-Host " REBOOT REQUIRED"
@@ -141,7 +162,11 @@ if ($rebootNeeded -or (Test-PendingReboot) -or $statusSaysEnable) {
     # Do NOT continue to distro install -- WSL is not usable yet.
     exit 2
 }
-Write-Host "WSL is operational."
+if ($wslOk) {
+    Write-Host "WSL is operational (reboot not needed)."
+} else {
+    Write-Host "WSL is operational."
+}
 
 # =============================================
 # Distro install
