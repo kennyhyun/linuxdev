@@ -5,18 +5,17 @@
 #   - created THREE fresh empty vhdx: data.vhdx, docker.vhdx, brew.vhdx
 #   - attached all three as bare block devices (/dev/sdX)
 #
-# This script (method B -- rsync, no vhdx cloning):
-#   1. Identifies the three empty attached devices.
-#   2. Formats each: data(linuxdev-data), docker(linuxdev-docker),
-#      brew(linuxdev-brew).
+# This script (rsync ONLY -- no fallback):
+#   0. REQUIRES rsync. If missing, it aborts immediately (does nothing).
+#   1. Identifies the empty attached devices.
+#   2. Formats data(linuxdev-data), docker(linuxdev-docker), brew(linuxdev-brew).
 #   3. Stops docker so it is not writing /var/lib/docker.
-#   4. rsync's /var (excluding /var/lib/docker) and /home into the data volume
-#      as /mnt/_migrate_data/{var,home}, preserving perms/owners/ACLs/xattrs.
-#   5. Empties the rootfs /var/* and /home/* (keeps the dirs as mountpoints);
-#      wipes /var/lib/docker (docker data discarded by design).
-#
-# Only docker + journald write /var during this; docker is stopped and journald
-# only appends harmless log lines, so the copy is consistent.
+#   4. rsync's /var (excluding /var/lib/docker) and /home onto the data volume,
+#      preserving perms/owners/ACLs/xattrs/hardlinks.
+#   5. VERIFIES the copy (compares source vs destination byte counts). Only if
+#      the copy looks complete does it empty the rootfs /var/* and /home/*
+#      (keeping the dirs as mountpoints). This prevents wiping the rootfs when
+#      the copy silently failed.
 #
 # Usage (invoked by migrate-disks.ps1):
 #   migrate-disks.sh --data-label linuxdev-data \
@@ -41,36 +40,25 @@ done
 
 log() { echo "[migrate-disks] $*"; }
 
-# copy_tree SRC_DIR DST_DIR [EXCLUDE_REL]
-# Copies the CONTENTS of SRC_DIR into DST_DIR, preserving perms/owners/times.
-# Prefers rsync (handles ACLs/xattrs/hardlinks); falls back to tar (preserves
-# the same metadata and supports an exclude) when rsync is not installed.
-copy_tree() {
-    local src="$1" dst="$2" exclude="${3:-}"
-    if command -v rsync >/dev/null 2>&1; then
-        if [ -n "$exclude" ]; then
-            rsync -aHAX --numeric-ids --delete --exclude="/$exclude" "$src/" "$dst/"
-        else
-            rsync -aHAX --numeric-ids --delete "$src/" "$dst/"
-        fi
-    else
-        # tar fallback: preserves perms/owners/times/hardlinks; no rsync needed.
-        log "  (rsync not found; using tar fallback for $src)"
-        if [ -n "$exclude" ]; then
-            ( cd "$src" && tar --numeric-owner --xattrs --acls \
-                --exclude="./$exclude" -cf - . ) | ( cd "$dst" && tar -xf - )
-        else
-            ( cd "$src" && tar --numeric-owner --xattrs --acls -cf - . ) \
-                | ( cd "$dst" && tar -xf - )
-        fi
-    fi
-}
+# ---------------------------------------------------------------------
+# Step 0: rsync is MANDATORY. Do not start without it.
+# ---------------------------------------------------------------------
+if ! command -v rsync >/dev/null 2>&1; then
+    log "ERROR: rsync is not installed. This migration requires rsync."
+    log "Install it first (unlock rootfs if read-only):"
+    log "  sudo rootfs-rw && apt-get update && apt-get install -y rsync && sudo rootfs-ro"
+    log "Aborting without touching any disks."
+    exit 1
+fi
+
+# used-bytes of a directory tree (one filesystem, apparent size)
+tree_bytes() { du -sb --one-file-system "$1" 2>/dev/null | awk '{print $1}'; }
 
 # The rootfs device (so we never format it).
 ROOT_DEV="$(findmnt -no SOURCE / | sed 's/\[.*//')"
 log "rootfs device: $ROOT_DEV"
 
-# All three new vhdx are empty (no filesystem). Collect unformatted whole disks.
+# Collect unformatted whole disks (the fresh data/docker/brew vhdx).
 EMPTY_DEVS=()
 for d in /dev/sd*; do
     [ -b "$d" ] || continue
@@ -87,13 +75,12 @@ if [ "${#EMPTY_DEVS[@]}" -lt 2 ]; then
 fi
 log "empty devices: ${EMPTY_DEVS[*]}"
 
-# Deterministic assignment by device order: data, docker, brew.
 DATA_DEV="${EMPTY_DEVS[0]}"
 DOCKER_DEV="${EMPTY_DEVS[1]}"
 BREW_DEV="${EMPTY_DEVS[2]:-}"
 
 # ---------------------------------------------------------------------
-# Step A: format the three volumes
+# Step A: format the volumes
 # ---------------------------------------------------------------------
 log "Formatting $DATA_DEV   -> ext4 [$DATA_LABEL]"
 mkfs.ext4 -q -L "$DATA_LABEL" -F "$DATA_DEV"
@@ -115,15 +102,56 @@ mkdir -p "$DATA_MNT"
 mount "$DATA_DEV" "$DATA_MNT"
 mkdir -p "$DATA_MNT/var" "$DATA_MNT/home"
 
+# Source sizes measured the SAME way we exclude in rsync, for an apples-to-
+# apples verification afterwards.
+SRC_VAR_BYTES="$( { du -sb --one-file-system --exclude='lib/docker' /var 2>/dev/null || true; } | awk '{print $1}')"
+SRC_HOME_BYTES="$(tree_bytes /home)"
+log "source sizes: /var(excl docker)=${SRC_VAR_BYTES:-0}B /home=${SRC_HOME_BYTES:-0}B"
+
 log "Copying /var -> data volume (excluding /var/lib/docker)"
-copy_tree /var "$DATA_MNT/var" "lib/docker"
-# ensure the mountpoint for the docker volume exists on the data volume
+rsync -aHAX --numeric-ids --delete --exclude='/lib/docker/' /var/ "$DATA_MNT/var/"
 mkdir -p "$DATA_MNT/var/lib/docker"
 
 log "Copying /home -> data volume"
-copy_tree /home "$DATA_MNT/home"
+rsync -aHAX --numeric-ids --delete /home/ "$DATA_MNT/home/"
 
 sync
+
+# ---------------------------------------------------------------------
+# Step B2: VERIFY the copy BEFORE emptying the rootfs
+# ---------------------------------------------------------------------
+DST_VAR_BYTES="$( { du -sb --one-file-system --exclude='lib/docker' "$DATA_MNT/var" 2>/dev/null || true; } | awk '{print $1}')"
+DST_HOME_BYTES="$(tree_bytes "$DATA_MNT/home")"
+log "dest sizes:   /var(excl docker)=${DST_VAR_BYTES:-0}B /home=${DST_HOME_BYTES:-0}B"
+
+# Guard: destination must be at least 90% of source (allow small rsync/journald
+# deltas). If not, the copy failed -- STOP before wiping the rootfs.
+verify_ratio_ok() {
+    local src="$1" dst="$2" name="$3"
+    src="${src:-0}"; dst="${dst:-0}"
+    if [ "$src" -eq 0 ]; then
+        return 0   # nothing to copy (e.g. empty /home on clean install)
+    fi
+    # dst * 100 >= src * 90  (integer math, avoid overflow with awk)
+    local ok
+    ok="$(awk -v s="$src" -v d="$dst" 'BEGIN{ print (d*100 >= s*90) ? 1 : 0 }')"
+    if [ "$ok" -ne 1 ]; then
+        log "ERROR: $name copy incomplete: dest=${dst}B is < 90% of source=${src}B"
+        return 1
+    fi
+    log "  verify $name OK (dest ${dst}B vs source ${src}B)"
+    return 0
+}
+
+if ! verify_ratio_ok "$SRC_VAR_BYTES" "$DST_VAR_BYTES" "/var" \
+   || ! verify_ratio_ok "$SRC_HOME_BYTES" "$DST_HOME_BYTES" "/home"; then
+    log "Copy verification FAILED. Leaving the rootfs untouched (no data lost)."
+    log "The data volume may be partially written; re-run migration with -Force."
+    umount "$DATA_MNT" 2>/dev/null || true
+    rmdir "$DATA_MNT" 2>/dev/null || true
+    exit 1
+fi
+
 umount "$DATA_MNT"
 rmdir "$DATA_MNT" 2>/dev/null || true
 
