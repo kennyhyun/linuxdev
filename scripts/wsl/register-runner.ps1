@@ -27,8 +27,8 @@
     .\register-runner.ps1 -DistroName Debian
 #>
 param(
-    [string]$DistroName = "Linuxdev",
-    [ValidateSet("shell","docker")]
+    [string]$DistroName = "",
+    [ValidateSet("", "shell", "docker")]   # "" = unspecified (fall back to .env / install-runner default)
     [string]$Executor = "",
     [string]$DockerImage = "",
     [switch]$Privileged,
@@ -68,7 +68,18 @@ $dockerImage = if ($DockerImage) { $DockerImage } elseif ($envVars.RUNNER_DOCKER
 
 # --- verify distro is running/available ---
 $distros = (wsl --list --quiet 2>$null) -replace "`0","" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-if ($distros -notcontains $DistroName) {
+if (-not $DistroName) {
+    if ($distros.Count -eq 1) {
+        $DistroName = $distros[0]
+        Write-Host "Auto-detected distro: $DistroName"
+    } elseif ($distros.Count -eq 0) {
+        Write-Error "No WSL distro installed. Install one first, or pass -DistroName."
+        exit 1
+    } else {
+        Write-Error "Multiple distros installed ($($distros -join ', ')). Pass -DistroName <name>."
+        exit 1
+    }
+} elseif ($distros -notcontains $DistroName) {
     Write-Error "Distro '$DistroName' not found. Installed: $($distros -join ', ')"
     exit 1
 }
