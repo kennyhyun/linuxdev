@@ -66,10 +66,11 @@ if ($distros -notcontains $DistroName) {
 }
 
 # --- 1) Write the VBS keep-alive launcher ---
-# Run(cmd, 0, False): 0 = hidden window (but console handle kept alive),
-#                     False = don't wait. 'exec sleep infinity' never returns,
-# so the session persists and WSL keeps the distro running.
-$wslCmd = "wsl.exe -d $DistroName -u root -- /bin/sh -c ""exec sleep infinity"""
+# Run(cmd, 0, False): 0 = hidden window (console handle kept alive, unlike
+#   Start-Process -Hidden which drops it), False = don't wait.
+# NOTE: pass "sleep infinity" directly (no 'sh -c') to avoid nested quotes
+#   inside the VBS string, which caused "unexpected end of statement".
+$wslCmd = "wsl.exe -d $DistroName -u root -- sleep infinity"
 $vbs = @"
 Set WshShell = CreateObject("WScript.Shell")
 WshShell.Run "$wslCmd", 0, False
