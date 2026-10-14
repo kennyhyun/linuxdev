@@ -29,18 +29,30 @@ DOCKER_LABEL="linuxdev-docker"
 DATA_INIT_GB=0
 DOCKER_INIT_GB=0
 DATA_MNT="/mnt/_setup_data"
+LOG_FILE=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --data-label)     DATA_LABEL="$2";     shift 2 ;;
         --docker-label)   DOCKER_LABEL="$2";   shift 2 ;;
+        --log-file)       LOG_FILE="$2";       shift 2 ;;
         --data-init-gb)   DATA_INIT_GB="$2";   shift 2 ;;
         --docker-init-gb) DOCKER_INIT_GB="$2"; shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 2 ;;
     esac
 done
 
-log() { echo "[setup-disks] $*"; }
+# Logging: always to stdout; also to LOG_FILE (durable, survives reboot) if set.
+if [ -n "$LOG_FILE" ]; then
+    mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
+    : > "$LOG_FILE" 2>/dev/null || LOG_FILE=""
+fi
+log() {
+    local msg="[setup-disks] $*"
+    echo "$msg"
+    [ -n "$LOG_FILE" ] && echo "$(date '+%Y-%m-%d %H:%M:%S') $msg" >> "$LOG_FILE" 2>/dev/null || true
+}
+log "setup-disks.sh start (data-label=$DATA_LABEL docker-label=$DOCKER_LABEL data-init=${DATA_INIT_GB}G docker-init=${DOCKER_INIT_GB}G)"
 
 # ---------------------------------------------------------------------
 # Step 0: rsync is MANDATORY. Do not start without it.
@@ -130,6 +142,26 @@ mkdir -p "$DATA_MNT/var" "$DATA_MNT/home"
 SRC_VAR_BYTES="$( { du -sb --one-file-system --exclude='lib/docker' /var 2>/dev/null || true; } | awk '{print $1}')"
 SRC_HOME_BYTES="$(tree_bytes /home)"
 log "source sizes: /var(excl docker)=${SRC_VAR_BYTES:-0}B /home=${SRC_HOME_BYTES:-0}B"
+
+# Diagnostic: what is currently in rootfs /home, and is /home ALREADY bound to
+# the data volume? If /home is already on $DATA_DEV, rsync would copy the volume
+# onto itself (with --delete) and wipe it. Detect and bail.
+log "diag: /home entries: $(ls -A /home 2>/dev/null | tr '\n' ' ')"
+HOME_SRC_DEV="$(findmnt -no SOURCE /home 2>/dev/null | sed 's/\[.*//')"
+log "diag: /home backing device = ${HOME_SRC_DEV:-<rootfs>} ; data device = $DATA_DEV"
+if [ -n "$HOME_SRC_DEV" ] && [ "$HOME_SRC_DEV" = "$DATA_DEV" ]; then
+    log "ERROR: /home is already mounted on the data volume ($DATA_DEV). Unmounting"
+    log "       it so we copy from the real rootfs /home, not the volume onto itself."
+    umount /home 2>/dev/null || log "  WARNING: could not unmount /home (may be busy)"
+    SRC_HOME_BYTES="$(tree_bytes /home)"
+    log "diag: after unmount, /home entries: $(ls -A /home 2>/dev/null | tr '\n' ' ') (${SRC_HOME_BYTES:-0}B)"
+fi
+# Same hazard for /var.
+VAR_SRC_DEV="$(findmnt -no SOURCE /var 2>/dev/null | sed 's/\[.*//')"
+if [ -n "$VAR_SRC_DEV" ] && [ "$VAR_SRC_DEV" = "$DATA_DEV" ]; then
+    log "ERROR: /var is already mounted on the data volume ($DATA_DEV). Unmounting."
+    umount /var 2>/dev/null || log "  WARNING: could not unmount /var (may be busy)"
+fi
 
 log "Copying /var -> data volume (excluding /var/lib/docker)"
 rsync -aHAX --numeric-ids --delete --exclude='/lib/docker/' /var/ "$DATA_MNT/var/"

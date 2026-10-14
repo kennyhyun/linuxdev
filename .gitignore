@@ -60,3 +60,6 @@ ssh.config*
 backup
 *~
 *.vdi
+
+# linuxdev runtime logs (bootstrap / setup-disks)
+/logs/

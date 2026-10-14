@@ -38,7 +38,16 @@ DOTFILES_BRANCH="${DOTFILES_BRANCH:-main}"
 # =============================================
 # Helpers
 # =============================================
-log() { echo "[bootstrap] $*"; }
+log() {
+    local msg="[bootstrap] $*"
+    echo "$msg"
+    if [ -n "${BOOTSTRAP_LOG:-}" ]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') $msg" >> "$BOOTSTRAP_LOG" 2>/dev/null || true
+    fi
+}
+# Durable log on the Windows drive (survives reboot / distro re-register).
+BOOTSTRAP_LOG="$SCRIPT_DIR/logs/bootstrap-$(date '+%Y%m%d-%H%M%S').log"
+mkdir -p "$SCRIPT_DIR/logs" 2>/dev/null && : > "$BOOTSTRAP_LOG" 2>/dev/null || BOOTSTRAP_LOG=""
 
 require_root() {
     if [ "$(id -u)" -ne 0 ]; then

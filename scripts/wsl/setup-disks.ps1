@@ -167,11 +167,17 @@ foreach ($v in @($dataVhdx, $dockerVhdx)) {
 }
 
 $wslRepo = (wsl -d $DistroName -u root -- bash -c "echo /mnt/c/Users/$env:USERNAME/linuxdev" 2>$null).Trim()
+$logStamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$winLogDir = Join-Path $env:USERPROFILE "linuxdev\logs"
+New-Item -ItemType Directory -Force -Path $winLogDir | Out-Null
+$wslLogFile = "$wslRepo/logs/setup-disks-$logStamp.log"
+Write-Host "   log: $winLogDir\setup-disks-$logStamp.log"
 wsl -d $DistroName -u root -- bash "$wslRepo/scripts/wsl/setup-disks.sh" `
     --data-label linuxdev-data `
     --docker-label linuxdev-docker `
     --data-init-gb $DataInitGB `
-    --docker-init-gb $DockerInitGB
+    --docker-init-gb $DockerInitGB `
+    --log-file $wslLogFile
 $rc = $LASTEXITCODE
 
 Stop-Job $job -ErrorAction SilentlyContinue
