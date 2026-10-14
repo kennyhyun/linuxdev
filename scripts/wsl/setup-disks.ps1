@@ -9,12 +9,12 @@
 #       * interactive -> ask: use existing / overwrite / abort
 #       * -NoConfirm  -> ERROR and stop (never silently overwrite data)
 #   - Otherwise: create data.vhdx + docker.vhdx (max = *_SIZE_GB), attach, then
-#     run setup-disks.sh which formats, preallocates (*_INIT_GB, written with dd),
+#     run setup-disks.sh which formats the volumes,
 #     and ALWAYS seeds the current rootfs /var + /home into the data volume
 #     (rsync) before emptying the rootfs dirs.
 #
-# Sizes come from .env (DATA_SIZE_GB/DOCKER_SIZE_GB caps, DATA_INIT_GB/
-# DOCKER_INIT_GB preallocation). Defaults: 64 cap, 24/48 init.
+# Sizes come from .env (DATA_SIZE_GB / DOCKER_SIZE_GB = vhdx max size, default 64).
+# The vhdx files are dynamic, so they start small and grow as data is written.
 #
 # Usage (Admin PowerShell):
 #   .\scripts\wsl\setup-disks.ps1 -DistroName Debian
@@ -52,10 +52,6 @@ function Get-EnvSizeGB {
 
 $DataSizeGB   = Get-EnvSizeGB "DATA_SIZE_GB"   64
 $DockerSizeGB = Get-EnvSizeGB "DOCKER_SIZE_GB" 64
-$DataInitGB   = Get-EnvSizeGB "DATA_INIT_GB"   24
-$DockerInitGB = Get-EnvSizeGB "DOCKER_INIT_GB" 48
-if ($DataInitGB   -gt $DataSizeGB)   { $DataInitGB   = $DataSizeGB }
-if ($DockerInitGB -gt $DockerSizeGB) { $DockerInitGB = $DockerSizeGB }
 
 $dataVhdx   = Join-Path $DiskDir "data.vhdx"
 $dockerVhdx = Join-Path $DiskDir "docker.vhdx"
@@ -66,8 +62,8 @@ Write-Host "========================================"
 Write-Host " Linuxdev WSL2 disk setup (A1: data + docker)"
 Write-Host " Distro : $DistroName"
 Write-Host " DiskDir: $DiskDir"
-Write-Host " data   : max=${DataSizeGB}G  init=${DataInitGB}G"
-Write-Host " docker : max=${DockerSizeGB}G  init=${DockerInitGB}G"
+Write-Host " data   : max=${DataSizeGB}G"
+Write-Host " docker : max=${DockerSizeGB}G"
 if ($WhatIf) { Write-Host " MODE   : DRY RUN (no changes)" }
 Write-Host "========================================"
 
@@ -157,7 +153,7 @@ if ($WhatIf) {
 # Step 3: boot a temp session, attach the new disks, run setup-disks.sh
 # =====================================================================
 Write-Host ""
-Write-Host ">> Formatting + preallocating + seeding inside $DistroName ..."
+Write-Host ">> Formatting + seeding inside $DistroName ..."
 
 $job = Start-Job { wsl -d $args[0] -u root -- sleep 600 } -ArgumentList $DistroName
 Start-Sleep -Seconds 3
@@ -175,8 +171,6 @@ Write-Host "   log: $winLogDir\setup-disks-$logStamp.log"
 wsl -d $DistroName -u root -- bash "$wslRepo/scripts/wsl/setup-disks.sh" `
     --data-label linuxdev-data `
     --docker-label linuxdev-docker `
-    --data-init-gb $DataInitGB `
-    --docker-init-gb $DockerInitGB `
     --log-file $wslLogFile
 $rc = $LASTEXITCODE
 

@@ -9,8 +9,7 @@
 #   0. REQUIRES rsync. If missing, abort without touching anything.
 #   1. Stop the linuxdev .mount units so a pending start job cannot mount the
 #      new volume onto /var and /home the moment it gets its label.
-#   2. Format data(linuxdev-data) and docker(linuxdev-docker); preallocate each
-#      to its INIT size by writing zeros (dd). INIT=0 disables prealloc.
+#   2. Format data(linuxdev-data) and docker(linuxdev-docker).
 #   3. Mount the ROOTFS BLOCK DEVICE a second time at a private path. All reads
 #      (seed source) and all deletes (emptying the rootfs) go through this
 #      mount, never through the live /var and /home paths, which may be bind
@@ -24,18 +23,15 @@
 #
 # Usage (invoked by setup-disks.ps1):
 #   setup-disks.sh --data-label linuxdev-data --docker-label linuxdev-docker \
-#                  --data-init-gb 24 --docker-init-gb 48 [--log-file <path>]
+#                  [--log-file <path>]
 
 set -euo pipefail
 
 DATA_LABEL="linuxdev-data"
 DOCKER_LABEL="linuxdev-docker"
-DATA_INIT_GB=0
-DOCKER_INIT_GB=0
 LOG_FILE=""
 
 DATA_MNT="/mnt/_setup_data"
-DOCKER_TMP="/mnt/_setup_docker"
 ROOTFS_SRC="/mnt/_setup_rootfs"
 MOUNT_UNITS="var-lib-docker.mount home.mount var.mount mnt-data.mount"
 
@@ -44,8 +40,6 @@ while [ $# -gt 0 ]; do
         --data-label)     DATA_LABEL="$2";     shift 2 ;;
         --docker-label)   DOCKER_LABEL="$2";   shift 2 ;;
         --log-file)       LOG_FILE="$2";       shift 2 ;;
-        --data-init-gb)   DATA_INIT_GB="$2";   shift 2 ;;
-        --docker-init-gb) DOCKER_INIT_GB="$2"; shift 2 ;;
         *) echo "unknown arg: $1" >&2; exit 2 ;;
     esac
 done
@@ -65,7 +59,7 @@ log() {
 
 # Always release our private mounts, whatever happens.
 cleanup() {
-    for m in "$DOCKER_TMP" "$DATA_MNT" "$ROOTFS_SRC"; do
+    for m in "$DATA_MNT" "$ROOTFS_SRC"; do
         if mountpoint -q "$m" 2>/dev/null; then umount "$m" 2>/dev/null || umount -l "$m" 2>/dev/null || true; fi
         rmdir "$m" 2>/dev/null || true
     done
@@ -74,7 +68,7 @@ trap cleanup EXIT
 
 die() { log "ERROR: $*"; log "Aborting. The rootfs /var and /home were NOT modified."; exit 1; }
 
-log "setup-disks.sh start (data-label=$DATA_LABEL docker-label=$DOCKER_LABEL data-init=${DATA_INIT_GB}G docker-init=${DOCKER_INIT_GB}G)"
+log "setup-disks.sh start (data-label=$DATA_LABEL docker-label=$DOCKER_LABEL)"
 
 # ---------------------------------------------------------------------
 # Step 0: rsync is MANDATORY. Do not start without it.
@@ -94,47 +88,6 @@ var_bytes() { { du -sb --one-file-system --exclude='lib/docker' "$1" 2>/dev/null
 
 # Device backing a path (strip any "[/subdir]" bind suffix).
 backing_dev() { findmnt -no SOURCE --target "$1" 2>/dev/null | head -1 | sed 's/\[.*//'; }
-
-# Preallocate real blocks on a mounted volume by WRITING zeros (dd), then remove
-# the file. fallocate does not work for this: it only reserves space inside the
-# ext4 and never writes to the block device, so a dynamic vhdx stays small
-# (measured: fallocate left the backing file at its initial size, dd grew it).
-# After the dd file is removed the vhdx keeps its grown size and the ext4 is
-# empty. Written in 1 GiB chunks so progress is logged; a failure only warns
-# (this is a speed optimisation, not required for correctness).
-preallocate() {
-    local mnt="$1" gb="$2"
-    local f="$mnt/.linuxdev-prealloc"
-    [ "${gb:-0}" -gt 0 ] || { log "  prealloc $mnt: skipped (0)"; return 0; }
-
-    # Never ask for more than the filesystem can hold (keep ~1 GiB headroom).
-    local avail
-    avail="$(df -BG --output=avail "$mnt" 2>/dev/null | tail -1 | tr -dc '0-9')"
-    avail="${avail:-0}"
-    if [ "$gb" -ge "$avail" ]; then
-        log "  prealloc $mnt: requested ${gb}G but only ${avail}G free - using $(( avail > 1 ? avail - 1 : 0 ))G"
-        gb=$(( avail > 1 ? avail - 1 : 0 ))
-        [ "$gb" -gt 0 ] || { log "  prealloc $mnt: skipped (no space)"; return 0; }
-    fi
-
-    log "  prealloc $mnt: writing ${gb}G of zeros (dd, 1 GiB chunks) ..."
-    local i=0 t0=$SECONDS
-    : > "$f"
-    while [ "$i" -lt "$gb" ]; do
-        if ! dd if=/dev/zero of="$f" bs=1M count=1024 oflag=append conv=notrunc status=none 2>/dev/null; then
-            log "  prealloc $mnt: WARNING write failed after ${i}G (continuing)"
-            break
-        fi
-        i=$(( i + 1 ))
-        if [ $(( i % 4 )) -eq 0 ] || [ "$i" -eq "$gb" ]; then
-            log "  prealloc $mnt: ${i}/${gb}G written ($(( SECONDS - t0 ))s)"
-        fi
-    done
-    sync
-    rm -f "$f"
-    sync
-    log "  prealloc $mnt: done - ${i}G written in $(( SECONDS - t0 ))s"
-}
 
 # The rootfs device (never formatted; used as the seed source).
 ROOT_DEV="$(findmnt -no SOURCE / | sed 's/\[.*//')"
@@ -180,7 +133,7 @@ DATA_DEV="${EMPTY_DEVS[0]}"
 DOCKER_DEV="${EMPTY_DEVS[1]}"
 
 # ---------------------------------------------------------------------
-# Step 2: format + preallocate
+# Step 2: format
 # ---------------------------------------------------------------------
 log "Formatting $DATA_DEV   -> ext4 [$DATA_LABEL]"
 mkfs.ext4 -q -L "$DATA_LABEL" -F "$DATA_DEV"
@@ -194,12 +147,6 @@ for p in /var /home; do
     log "diag: $p backing device after format = ${dev:-?}"
     [ "$dev" = "$ROOT_DEV" ] || die "$p got mounted from $dev after formatting."
 done
-
-mkdir -p "$DOCKER_TMP"
-mount "$DOCKER_DEV" "$DOCKER_TMP"
-preallocate "$DOCKER_TMP" "$DOCKER_INIT_GB"
-umount "$DOCKER_TMP"
-rmdir "$DOCKER_TMP" 2>/dev/null || true
 
 # ---------------------------------------------------------------------
 # Step 3: private mount of the rootfs device (seed source)
@@ -224,7 +171,6 @@ systemctl stop docker docker.socket 2>/dev/null || true
 
 mkdir -p "$DATA_MNT"
 mount "$DATA_DEV" "$DATA_MNT"
-preallocate "$DATA_MNT" "$DATA_INIT_GB"
 mkdir -p "$DATA_MNT/var" "$DATA_MNT/home"
 
 SRC_VAR_BYTES="$(var_bytes "$SRC_VAR")"

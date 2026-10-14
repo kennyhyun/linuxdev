@@ -85,7 +85,7 @@ Start-Sleep -Seconds 2
 
 # =============================================
 # Step 3: Setup data disks (A1: data + docker). This creates the volumes,
-# preallocates, seeds /var + /home onto the data volume, and leaves the next
+# seeds /var + /home onto the data volume, and leaves the next
 # boot to the systemd .mount units.
 # =============================================
 if (-not $SkipDisks) {
