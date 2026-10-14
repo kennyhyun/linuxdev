@@ -5,22 +5,26 @@
 #   - created TWO fresh empty vhdx: data.vhdx, docker.vhdx
 #   - attached both as bare block devices (/dev/sdX)
 #
-# This script (rsync ONLY -- no fallback):
-#   0. REQUIRES rsync. If missing, it aborts immediately (does nothing).
-#   1. Identifies the empty attached devices.
-#   2. Formats data(linuxdev-data) and docker(linuxdev-docker).
-#   3. Preallocates each volume to its INIT size (fallocate) so it does not pay
-#      the grow-on-first-write penalty later. INIT=0 disables prealloc.
-#   4. Stops docker, then ALWAYS seeds: rsync /var (excluding /var/lib/docker)
-#      and /home onto the data volume, preserving perms/owners/ACLs/xattrs.
-#   5. VERIFIES the copy (source vs dest byte counts). Only if the copy looks
-#      complete does it empty the rootfs /var/* and /home/* (keeping the dirs).
+# Steps (rsync ONLY -- no fallback):
+#   0. REQUIRES rsync. If missing, abort without touching anything.
+#   1. Stop the linuxdev .mount units so a pending start job cannot mount the
+#      new volume onto /var and /home the moment it gets its label.
+#   2. Format data(linuxdev-data) and docker(linuxdev-docker); preallocate each
+#      to its INIT size (fallocate). INIT=0 disables prealloc.
+#   3. Mount the ROOTFS BLOCK DEVICE a second time at a private path. All reads
+#      (seed source) and all deletes (emptying the rootfs) go through this
+#      mount, never through the live /var and /home paths, which may be bind
+#      mounts of the data volume. (Reading the live paths once copied the empty
+#      data volume onto itself and lost the dpkg DB.)
+#   4. rsync rootfs var (excluding var/lib/docker) and home onto the data volume.
+#   5. Verify (sizes + var/lib/dpkg present on the data volume). Only then empty
+#      the rootfs var/ and home/ (dirs kept as mountpoints).
 #
 # /home/linuxbrew lives inside the data volume -- no separate brew volume.
 #
 # Usage (invoked by setup-disks.ps1):
 #   setup-disks.sh --data-label linuxdev-data --docker-label linuxdev-docker \
-#                  --data-init-gb 24 --docker-init-gb 48
+#                  --data-init-gb 24 --docker-init-gb 48 [--log-file <path>]
 
 set -euo pipefail
 
@@ -28,8 +32,12 @@ DATA_LABEL="linuxdev-data"
 DOCKER_LABEL="linuxdev-docker"
 DATA_INIT_GB=0
 DOCKER_INIT_GB=0
-DATA_MNT="/mnt/_setup_data"
 LOG_FILE=""
+
+DATA_MNT="/mnt/_setup_data"
+DOCKER_TMP="/mnt/_setup_docker"
+ROOTFS_SRC="/mnt/_setup_rootfs"
+MOUNT_UNITS="var-lib-docker.mount home.mount var.mount mnt-data.mount"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -50,8 +58,22 @@ fi
 log() {
     local msg="[setup-disks] $*"
     echo "$msg"
-    [ -n "$LOG_FILE" ] && echo "$(date '+%Y-%m-%d %H:%M:%S') $msg" >> "$LOG_FILE" 2>/dev/null || true
+    if [ -n "$LOG_FILE" ]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') $msg" >> "$LOG_FILE" 2>/dev/null || true
+    fi
 }
+
+# Always release our private mounts, whatever happens.
+cleanup() {
+    for m in "$DOCKER_TMP" "$DATA_MNT" "$ROOTFS_SRC"; do
+        if mountpoint -q "$m" 2>/dev/null; then umount "$m" 2>/dev/null || umount -l "$m" 2>/dev/null || true; fi
+        rmdir "$m" 2>/dev/null || true
+    done
+}
+trap cleanup EXIT
+
+die() { log "ERROR: $*"; log "Aborting. The rootfs /var and /home were NOT modified."; exit 1; }
+
 log "setup-disks.sh start (data-label=$DATA_LABEL docker-label=$DOCKER_LABEL data-init=${DATA_INIT_GB}G docker-init=${DOCKER_INIT_GB}G)"
 
 # ---------------------------------------------------------------------
@@ -67,6 +89,11 @@ fi
 
 # used-bytes of a directory tree (one filesystem, apparent size)
 tree_bytes() { du -sb --one-file-system "$1" 2>/dev/null | awk '{print $1}'; }
+# used-bytes of a var tree, excluding lib/docker (docker has its own volume)
+var_bytes() { { du -sb --one-file-system --exclude='lib/docker' "$1" 2>/dev/null || true; } | awk '{print $1}'; }
+
+# Device backing a path (strip any "[/subdir]" bind suffix).
+backing_dev() { findmnt -no SOURCE --target "$1" 2>/dev/null | head -1 | sed 's/\[.*//'; }
 
 # Preallocate real blocks on a mounted volume: fallocate a reserved file of GB
 # size (instant, reserves extents), then remove it. The vhdx keeps the grown
@@ -85,9 +112,28 @@ preallocate() {
     fi
 }
 
-# The rootfs device (so we never format it).
+# The rootfs device (never formatted; used as the seed source).
 ROOT_DEV="$(findmnt -no SOURCE / | sed 's/\[.*//')"
 log "rootfs device: $ROOT_DEV"
+[ -b "$ROOT_DEV" ] || die "rootfs device '$ROOT_DEV' is not a block device"
+
+# ---------------------------------------------------------------------
+# Step 1: keep the .mount units from grabbing the new volume
+# ---------------------------------------------------------------------
+# On this boot the units are waiting for LABEL=linuxdev-data to appear; as soon
+# as mkfs creates the label they would bind it onto /var and /home. Stopping
+# them cancels those pending jobs. The next boot (after wsl --terminate) starts
+# them normally.
+if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+    log "Stopping linuxdev mount units (cancel pending jobs): $MOUNT_UNITS"
+    # shellcheck disable=SC2086
+    systemctl stop $MOUNT_UNITS 2>/dev/null || true
+fi
+for p in /var /home; do
+    dev="$(backing_dev "$p")"
+    log "diag: $p backing device before format = ${dev:-?}"
+    [ "$dev" = "$ROOT_DEV" ] || die "$p is not on the rootfs ($dev). Detach data disks / reboot and retry."
+done
 
 # Collect unformatted whole disks (the fresh data/docker vhdx).
 EMPTY_DEVS=()
@@ -110,17 +156,21 @@ DATA_DEV="${EMPTY_DEVS[0]}"
 DOCKER_DEV="${EMPTY_DEVS[1]}"
 
 # ---------------------------------------------------------------------
-# Step A: format the volumes
+# Step 2: format + preallocate
 # ---------------------------------------------------------------------
 log "Formatting $DATA_DEV   -> ext4 [$DATA_LABEL]"
 mkfs.ext4 -q -L "$DATA_LABEL" -F "$DATA_DEV"
 log "Formatting $DOCKER_DEV -> ext4 [$DOCKER_LABEL]"
 mkfs.ext4 -q -L "$DOCKER_LABEL" -F "$DOCKER_DEV"
+command -v udevadm >/dev/null 2>&1 && udevadm settle 2>/dev/null || true
 
-# ---------------------------------------------------------------------
-# Step A2: preallocate docker volume (data is prealloc'd after mount below)
-# ---------------------------------------------------------------------
-DOCKER_TMP="/mnt/_setup_docker"
+# Re-check: nothing may have mounted the new volume onto /var or /home.
+for p in /var /home; do
+    dev="$(backing_dev "$p")"
+    log "diag: $p backing device after format = ${dev:-?}"
+    [ "$dev" = "$ROOT_DEV" ] || die "$p got mounted from $dev after formatting."
+done
+
 mkdir -p "$DOCKER_TMP"
 mount "$DOCKER_DEV" "$DOCKER_TMP"
 preallocate "$DOCKER_TMP" "$DOCKER_INIT_GB"
@@ -128,62 +178,57 @@ umount "$DOCKER_TMP"
 rmdir "$DOCKER_TMP" 2>/dev/null || true
 
 # ---------------------------------------------------------------------
-# Step B: ALWAYS seed -- rsync /var (minus docker) and /home into data volume
+# Step 3: private mount of the rootfs device (seed source)
 # ---------------------------------------------------------------------
-log "Stopping docker before copying /var"
-systemctl stop docker 2>/dev/null || true
-systemctl stop docker.socket 2>/dev/null || true
+# The device is already mounted rw at /, so it cannot be mounted ro directly
+# ("would change RO state"). Mount rw, then flip THIS mount to read-only with a
+# bind remount (the live / stays rw).
+mkdir -p "$ROOTFS_SRC"
+mount "$ROOT_DEV" "$ROOTFS_SRC" || die "could not mount $ROOT_DEV at $ROOTFS_SRC"
+mount -o remount,bind,ro "$ROOTFS_SRC" || die "could not make $ROOTFS_SRC read-only"
+SRC_VAR="$ROOTFS_SRC/var"
+SRC_HOME="$ROOTFS_SRC/home"
+[ -d "$SRC_VAR" ] && [ -d "$SRC_HOME" ] || die "$SRC_VAR or $SRC_HOME missing"
+[ -d "$SRC_VAR/lib/dpkg" ] || die "$SRC_VAR/lib/dpkg not found - rootfs var looks incomplete"
+log "seed source: $ROOT_DEV mounted read-only at $ROOTFS_SRC"
+
+# ---------------------------------------------------------------------
+# Step 4: seed the data volume
+# ---------------------------------------------------------------------
+log "Stopping docker before copying var"
+systemctl stop docker docker.socket 2>/dev/null || true
 
 mkdir -p "$DATA_MNT"
 mount "$DATA_DEV" "$DATA_MNT"
 preallocate "$DATA_MNT" "$DATA_INIT_GB"
 mkdir -p "$DATA_MNT/var" "$DATA_MNT/home"
 
-SRC_VAR_BYTES="$( { du -sb --one-file-system --exclude='lib/docker' /var 2>/dev/null || true; } | awk '{print $1}')"
-SRC_HOME_BYTES="$(tree_bytes /home)"
-log "source sizes: /var(excl docker)=${SRC_VAR_BYTES:-0}B /home=${SRC_HOME_BYTES:-0}B"
+SRC_VAR_BYTES="$(var_bytes "$SRC_VAR")"
+SRC_HOME_BYTES="$(tree_bytes "$SRC_HOME")"
+log "source sizes (rootfs): var(excl docker)=${SRC_VAR_BYTES:-0}B home=${SRC_HOME_BYTES:-0}B"
+log "diag: rootfs home entries: $(ls -A "$SRC_HOME" 2>/dev/null | tr '\n' ' ')"
 
-# Diagnostic: what is currently in rootfs /home, and is /home ALREADY bound to
-# the data volume? If /home is already on $DATA_DEV, rsync would copy the volume
-# onto itself (with --delete) and wipe it. Detect and bail.
-log "diag: /home entries: $(ls -A /home 2>/dev/null | tr '\n' ' ')"
-HOME_SRC_DEV="$(findmnt -no SOURCE /home 2>/dev/null | sed 's/\[.*//')"
-log "diag: /home backing device = ${HOME_SRC_DEV:-<rootfs>} ; data device = $DATA_DEV"
-if [ -n "$HOME_SRC_DEV" ] && [ "$HOME_SRC_DEV" = "$DATA_DEV" ]; then
-    log "ERROR: /home is already mounted on the data volume ($DATA_DEV). Unmounting"
-    log "       it so we copy from the real rootfs /home, not the volume onto itself."
-    umount /home 2>/dev/null || log "  WARNING: could not unmount /home (may be busy)"
-    SRC_HOME_BYTES="$(tree_bytes /home)"
-    log "diag: after unmount, /home entries: $(ls -A /home 2>/dev/null | tr '\n' ' ') (${SRC_HOME_BYTES:-0}B)"
-fi
-# Same hazard for /var.
-VAR_SRC_DEV="$(findmnt -no SOURCE /var 2>/dev/null | sed 's/\[.*//')"
-if [ -n "$VAR_SRC_DEV" ] && [ "$VAR_SRC_DEV" = "$DATA_DEV" ]; then
-    log "ERROR: /var is already mounted on the data volume ($DATA_DEV). Unmounting."
-    umount /var 2>/dev/null || log "  WARNING: could not unmount /var (may be busy)"
-fi
-
-log "Copying /var -> data volume (excluding /var/lib/docker)"
-rsync -aHAX --numeric-ids --delete --exclude='/lib/docker/' /var/ "$DATA_MNT/var/"
+log "Copying rootfs var -> data volume (excluding var/lib/docker)"
+rsync -aHAX --numeric-ids --delete --exclude='/lib/docker/' "$SRC_VAR/" "$DATA_MNT/var/"
 mkdir -p "$DATA_MNT/var/lib/docker"
 
-log "Copying /home -> data volume"
-rsync -aHAX --numeric-ids --delete /home/ "$DATA_MNT/home/"
-
+log "Copying rootfs home -> data volume"
+rsync -aHAX --numeric-ids --delete "$SRC_HOME/" "$DATA_MNT/home/"
 sync
 
 # ---------------------------------------------------------------------
-# Step B2: VERIFY the copy BEFORE emptying the rootfs
+# Step 5: verify, then empty the rootfs var/ and home/
 # ---------------------------------------------------------------------
-DST_VAR_BYTES="$( { du -sb --one-file-system --exclude='lib/docker' "$DATA_MNT/var" 2>/dev/null || true; } | awk '{print $1}')"
+DST_VAR_BYTES="$(var_bytes "$DATA_MNT/var")"
 DST_HOME_BYTES="$(tree_bytes "$DATA_MNT/home")"
-log "dest sizes:   /var(excl docker)=${DST_VAR_BYTES:-0}B /home=${DST_HOME_BYTES:-0}B"
+log "dest sizes:   var(excl docker)=${DST_VAR_BYTES:-0}B home=${DST_HOME_BYTES:-0}B"
 
 verify_ratio_ok() {
     local src="$1" dst="$2" name="$3"
     src="${src:-0}"; dst="${dst:-0}"
     if [ "$src" -eq 0 ]; then
-        return 0   # nothing to copy (e.g. empty /home)
+        log "  verify $name: source empty, nothing to copy"
+        return 0
     fi
     local ok
     ok="$(awk -v s="$src" -v d="$dst" 'BEGIN{ print (d*100 >= s*90) ? 1 : 0 }')"
@@ -195,40 +240,27 @@ verify_ratio_ok() {
     return 0
 }
 
-if ! verify_ratio_ok "$SRC_VAR_BYTES" "$DST_VAR_BYTES" "/var" \
-   || ! verify_ratio_ok "$SRC_HOME_BYTES" "$DST_HOME_BYTES" "/home"; then
-    log "Copy verification FAILED. Leaving the rootfs untouched (no data lost)."
-    log "The data volume may be partially written; re-run setup with -Force."
-    umount "$DATA_MNT" 2>/dev/null || true
-    rmdir "$DATA_MNT" 2>/dev/null || true
-    exit 1
-fi
+verify_ratio_ok "$SRC_VAR_BYTES" "$DST_VAR_BYTES" "var" || die "var copy verification failed"
+verify_ratio_ok "$SRC_HOME_BYTES" "$DST_HOME_BYTES" "home" || die "home copy verification failed"
+[ -d "$DATA_MNT/var/lib/dpkg" ] || die "var/lib/dpkg missing on the data volume after copy"
+log "  verify var/lib/dpkg present on data volume"
 
 umount "$DATA_MNT"
 rmdir "$DATA_MNT" 2>/dev/null || true
 
-# ---------------------------------------------------------------------
-# Step C: empty the rootfs /var and /home (keep dirs as mountpoints)
-# ---------------------------------------------------------------------
-log "Emptying rootfs /home/*"
-shopt -s dotglob
-for entry in /home/*; do
-    [ -e "$entry" ] || continue
-    rm -rf --one-file-system "$entry"
+# Empty the rootfs copies through the private mount only (never the live paths).
+mount -o remount,bind,rw "$ROOTFS_SRC" || die "could not make $ROOTFS_SRC writable for cleanup"
+shopt -s dotglob nullglob
+log "Emptying rootfs home/ (via $ROOTFS_SRC)"
+for entry in "$ROOTFS_SRC/home/"*; do
+    rm -rf --one-file-system "$entry" || log "  WARNING: could not remove $entry"
 done
-shopt -u dotglob
-
-log "Emptying rootfs /var/* (keeps /var as a mountpoint)"
-shopt -s dotglob
-for entry in /var/*; do
-    name="$(basename "$entry")"
-    case "$name" in
-        lost+found) : ;;
-        *) rm -rf --one-file-system "$entry" 2>/dev/null || true ;;
-    esac
+log "Emptying rootfs var/ (via $ROOTFS_SRC; dir kept as mountpoint)"
+for entry in "$ROOTFS_SRC/var/"*; do
+    rm -rf --one-file-system "$entry" 2>/dev/null || log "  WARNING: could not remove $entry"
 done
-shopt -u dotglob
-mkdir -p /var/lib/docker
+shopt -u dotglob nullglob
+log "rootfs after cleanup: var=$(tree_bytes "$ROOTFS_SRC/var")B home=$(tree_bytes "$ROOTFS_SRC/home")B"
 
 log "Done. data=$DATA_DEV docker=$DOCKER_DEV"
 log "Reboot (wsl --terminate) and let the .mount units take over."
