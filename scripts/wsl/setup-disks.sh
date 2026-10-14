@@ -10,7 +10,7 @@
 #   1. Stop the linuxdev .mount units so a pending start job cannot mount the
 #      new volume onto /var and /home the moment it gets its label.
 #   2. Format data(linuxdev-data) and docker(linuxdev-docker); preallocate each
-#      to its INIT size (fallocate). INIT=0 disables prealloc.
+#      to its INIT size by writing zeros (dd). INIT=0 disables prealloc.
 #   3. Mount the ROOTFS BLOCK DEVICE a second time at a private path. All reads
 #      (seed source) and all deletes (emptying the rootfs) go through this
 #      mount, never through the live /var and /home paths, which may be bind
@@ -95,21 +95,45 @@ var_bytes() { { du -sb --one-file-system --exclude='lib/docker' "$1" 2>/dev/null
 # Device backing a path (strip any "[/subdir]" bind suffix).
 backing_dev() { findmnt -no SOURCE --target "$1" 2>/dev/null | head -1 | sed 's/\[.*//'; }
 
-# Preallocate real blocks on a mounted volume: fallocate a reserved file of GB
-# size (instant, reserves extents), then remove it. The vhdx keeps the grown
-# physical size, but ext4 is empty and ready to use.
+# Preallocate real blocks on a mounted volume by WRITING zeros (dd), then remove
+# the file. fallocate does not work for this: it only reserves space inside the
+# ext4 and never writes to the block device, so a dynamic vhdx stays small
+# (measured: fallocate left the backing file at its initial size, dd grew it).
+# After the dd file is removed the vhdx keeps its grown size and the ext4 is
+# empty. Written in 1 GiB chunks so progress is logged; a failure only warns
+# (this is a speed optimisation, not required for correctness).
 preallocate() {
     local mnt="$1" gb="$2"
+    local f="$mnt/.linuxdev-prealloc"
     [ "${gb:-0}" -gt 0 ] || { log "  prealloc $mnt: skipped (0)"; return 0; }
-    log "  prealloc $mnt: fallocate ${gb}G ..."
-    if fallocate -l "${gb}G" "$mnt/.linuxdev-prealloc" 2>/dev/null; then
-        sync
-        rm -f "$mnt/.linuxdev-prealloc"
-        log "  prealloc $mnt: ${gb}G reserved"
-    else
-        log "  prealloc $mnt: WARNING fallocate failed (continuing without prealloc)"
-        rm -f "$mnt/.linuxdev-prealloc" 2>/dev/null || true
+
+    # Never ask for more than the filesystem can hold (keep ~1 GiB headroom).
+    local avail
+    avail="$(df -BG --output=avail "$mnt" 2>/dev/null | tail -1 | tr -dc '0-9')"
+    avail="${avail:-0}"
+    if [ "$gb" -ge "$avail" ]; then
+        log "  prealloc $mnt: requested ${gb}G but only ${avail}G free - using $(( avail > 1 ? avail - 1 : 0 ))G"
+        gb=$(( avail > 1 ? avail - 1 : 0 ))
+        [ "$gb" -gt 0 ] || { log "  prealloc $mnt: skipped (no space)"; return 0; }
     fi
+
+    log "  prealloc $mnt: writing ${gb}G of zeros (dd, 1 GiB chunks) ..."
+    local i=0 t0=$SECONDS
+    : > "$f"
+    while [ "$i" -lt "$gb" ]; do
+        if ! dd if=/dev/zero of="$f" bs=1M count=1024 oflag=append conv=notrunc status=none 2>/dev/null; then
+            log "  prealloc $mnt: WARNING write failed after ${i}G (continuing)"
+            break
+        fi
+        i=$(( i + 1 ))
+        if [ $(( i % 4 )) -eq 0 ] || [ "$i" -eq "$gb" ]; then
+            log "  prealloc $mnt: ${i}/${gb}G written ($(( SECONDS - t0 ))s)"
+        fi
+    done
+    sync
+    rm -f "$f"
+    sync
+    log "  prealloc $mnt: done - ${i}G written in $(( SECONDS - t0 ))s"
 }
 
 # The rootfs device (never formatted; used as the seed source).

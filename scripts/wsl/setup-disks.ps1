@@ -9,7 +9,7 @@
 #       * interactive -> ask: use existing / overwrite / abort
 #       * -NoConfirm  -> ERROR and stop (never silently overwrite data)
 #   - Otherwise: create data.vhdx + docker.vhdx (max = *_SIZE_GB), attach, then
-#     run setup-disks.sh which formats, preallocates (*_INIT_GB via fallocate),
+#     run setup-disks.sh which formats, preallocates (*_INIT_GB, written with dd),
 #     and ALWAYS seeds the current rootfs /var + /home into the data volume
 #     (rsync) before emptying the rootfs dirs.
 #
