@@ -293,16 +293,23 @@ See the banner printed by `setup.ps1` for the full list of flags
 > Only needed if you want this machine to act as a GitLab CI runner.
 > Skip this if you only need a local dev environment.
 
-After the distro is bootstrapped (docker available), run the optional scripts:
+After the distro is bootstrapped (docker available), set up the runner:
 
-1. Install + register the runner (inside WSL, as root):
+1. Put the runner token (and optional overrides) in `.env`:
 
-   ```bash
-   sudo bash scripts/wsl/install-runner.sh \
-     --url https://gitlab.imaginetoolbox.com \
-     --token <registration-token> \
-     --tags linux,localstack,runner \
-     --autostart
+   ```
+   RUNNER_TOKEN=glrt-xxxxxxxx                      # required (GitLab 16+ token)
+   RUNNER_URL=https://gitlab.imaginetoolbox.com    # optional
+   RUNNER_TAGS=linux,localstack,runner             # optional
+   RUNNER_EXECUTOR=docker                          # optional (shell|docker)
+   RUNNER_DOCKER_IMAGE=whitech/lambda:build-22.11  # optional
+   ```
+
+2. Register the runner (admin PowerShell). This reads `.env` and runs
+   `install-runner.sh` inside the distro, keeping the token off the command line:
+
+   ```powershell
+   .\scripts\wsl\register-runner.ps1 -DistroName <DistroName>
    ```
 
    - Installs the `gitlab-runner` binary and registers it with the given tags.
@@ -311,7 +318,7 @@ After the distro is bootstrapped (docker available), run the optional scripts:
      (auto-start on boot + restart on crash). Otherwise it falls back to a
      `wsl-boot.sh` start hook.
 
-2. Auto-start the distro at Windows logon (admin PowerShell):
+3. Auto-start the distro at Windows logon (admin PowerShell):
 
    ```powershell
    .\scripts\wsl\register-autostart.ps1 -DistroName <DistroName>
