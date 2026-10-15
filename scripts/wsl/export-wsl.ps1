@@ -52,10 +52,13 @@ $tarSize = [math]::Round((Get-Item $TarPath).Length / 1GB, 2)
 Write-Host "Exported: $tarSize GB"
 
 # Compress with 7z (split into 256MB volumes)
-if (-not (Get-Command 7z -ErrorAction SilentlyContinue)) {
+. "$PSScriptRoot\..\common\wsl-utils.ps1"
+$sevenZip = Find-7Zip
+if (-not $sevenZip) {
     Write-Error "7-Zip not found. Install with: winget install 7zip.7zip"
     exit 1
 }
+Add-7ZipToPath $sevenZip
 
 Write-Host "Compressing with 7-Zip (256MB splits)..."
 $VolumeSize = "268435456"  # 256MB

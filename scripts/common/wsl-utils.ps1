@@ -62,3 +62,28 @@ function Install-BootstrapMessage {
     Write-Host "  2. Run bootstrap-wsl.sh inside WSL:"
     Write-Host "       wsl -d $DistroName -u root -- bash /mnt/c/Users/$env:USERNAME/linuxdev/bootstrap-wsl.sh"
 }
+
+# The 7-Zip installer does NOT add itself to PATH, so `Get-Command 7z` alone
+# misses an existing install. Look on PATH, then in the registry and the
+# default install folders. Returns the full path of 7z.exe, or $null.
+function Find-7Zip {
+    $cmd = Get-Command 7z -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    $dirs = @()
+    foreach ($key in 'HKLM:\SOFTWARE\7-Zip', 'HKCU:\SOFTWARE\7-Zip') {
+        $p = Get-ItemProperty $key -ErrorAction SilentlyContinue
+        if ($p) { $dirs += $p.Path64, $p.Path }
+    }
+    $dirs += "$env:ProgramFiles\7-Zip", "${env:ProgramFiles(x86)}\7-Zip"
+    foreach ($d in $dirs) {
+        if ($d -and (Test-Path (Join-Path $d "7z.exe"))) { return (Join-Path $d "7z.exe") }
+    }
+    return $null
+}
+
+# Put the folder of the given 7z.exe on PATH for this session so `7z` works.
+function Add-7ZipToPath {
+    param([string]$Exe)
+    $dir = Split-Path $Exe -Parent
+    if (($env:Path -split ';') -notcontains $dir) { $env:Path = "$env:Path;$dir" }
+}

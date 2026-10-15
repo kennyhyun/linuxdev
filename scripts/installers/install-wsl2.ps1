@@ -68,8 +68,13 @@ try { wsl --set-default-version 2 2>$null; Write-Host "  WSL default version: 2"
 # =============================================
 Write-Host "---------------------------------------"
 Write-Host "Checking 7-Zip..."
-if (Get-Command 7z -ErrorAction SilentlyContinue) {
-    Write-Host "7-Zip already installed"
+
+# Find-7Zip / Add-7ZipToPath come from wsl-utils.ps1 (the installer does not
+# put 7-Zip on PATH, so an existing install is looked up explicitly).
+$sevenZip = Find-7Zip
+if ($sevenZip) {
+    Add-7ZipToPath $sevenZip
+    Write-Host "7-Zip already installed: $sevenZip"
 } else {
     Write-Host "Installing 7-Zip via winget..."
     try {
@@ -82,7 +87,9 @@ if (Get-Command 7z -ErrorAction SilentlyContinue) {
         Start-Process -FilePath $installer -ArgumentList "/S" -Wait
         Refresh-Path
     }
-    Write-Host "7-Zip installed"
+    $sevenZip = Find-7Zip
+    if ($sevenZip) { Add-7ZipToPath $sevenZip; Write-Host "7-Zip installed: $sevenZip" }
+    else { Write-Warning "7-Zip was installed but 7z.exe could not be located." }
 }
 
 # =============================================
