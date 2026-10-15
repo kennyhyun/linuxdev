@@ -1,8 +1,23 @@
 $ErrorActionPreference = "Stop"
 $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
 if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-  Write-Host "Please run as an administrator"
-  exit 109
+  # Not elevated: relaunch this script with the same arguments through a UAC
+  # prompt (runas) in a new window, then end this non-elevated instance.
+  Write-Host "Administrator rights are required. Requesting elevation (UAC prompt)..."
+  $argLine = ($args | ForEach-Object {
+    $a = "$_"
+    if ($a -match '[\s"]') { '"' + ($a -replace '"', '\"') + '"' } else { $a }
+  }) -join ' '
+  $psExe = (Get-Process -Id $PID).Path
+  try {
+    Start-Process -FilePath $psExe -Verb RunAs -WorkingDirectory $PSScriptRoot `
+      -ArgumentList "-NoProfile -ExecutionPolicy Bypass -NoExit -File `"$PSCommandPath`" $argLine"
+  } catch {
+    Write-Host "Administrator permission was not granted. Please run as an administrator."
+    exit 109
+  }
+  Write-Host "Continuing in the elevated window."
+  exit 0
 }
 
 # --- Argument parsing ---
