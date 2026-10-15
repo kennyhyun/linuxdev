@@ -105,15 +105,15 @@ Write-Host "========================================"
 # =====================================================================
 # Existence guard: never silently clobber existing data volumes.
 # =====================================================================
-if (Test-Path $dataVhdx) {
+if ((Test-Path $dataVhdx) -or (Test-Path $dockerVhdx)) {
     if ($Force) {
         Write-Host "-Force: discarding existing data.vhdx / docker.vhdx"
     } elseif ($NoConfirm) {
-        Write-Error "data.vhdx already exists ($dataVhdx) and -NoConfirm was given. Refusing to overwrite. Re-run with -Force to overwrite, or remove the file manually."
+        Write-Error "data.vhdx or docker.vhdx already exists in $DiskDir and -NoConfirm was given. Refusing to overwrite. Re-run with -Force to overwrite, or remove the files manually."
         exit 1
     } else {
         Write-Host ""
-        Write-Host "data.vhdx already exists: $dataVhdx"
+        Write-Host "data.vhdx / docker.vhdx already exist in: $DiskDir"
         Write-Host "  [U] Use existing disks as-is (do nothing)"
         Write-Host "  [O] Overwrite (DELETE and recreate -- data on these volumes is lost)"
         Write-Host "  [A] Abort"
@@ -211,9 +211,12 @@ foreach ($v in @($dataVhdx, $dockerVhdx)) {
     if (Test-Path $v) { wsl --mount --vhd $v --bare 2>&1 | Out-Null; Start-Sleep -Milliseconds 500 }
 }
 
-$wslRepo = (wsl -d $DistroName -u root -- bash -c "echo /mnt/c/Users/$env:USERNAME/linuxdev" 2>$null).Trim()
+# This repo's root as seen from WSL (the repo can live anywhere):
+# scripts/wsl/setup-disks.ps1 -> ..\..
+$repoRoot = (Resolve-Path "$PSScriptRoot\..\..").Path
+$wslRepo = if ($repoRoot -match '^([A-Za-z]):\\(.*)$') { "/mnt/$($matches[1].ToLower())/$($matches[2] -replace '\\','/')" } else { $repoRoot -replace '\\','/' }
 $logStamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$winLogDir = Join-Path $env:USERPROFILE "linuxdev\logs"
+$winLogDir = Join-Path $repoRoot "logs"
 New-Item -ItemType Directory -Force -Path $winLogDir | Out-Null
 $wslLogFile = "$wslRepo/logs/setup-disks-$logStamp.log"
 Write-Host "   log: $winLogDir\setup-disks-$logStamp.log"

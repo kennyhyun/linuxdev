@@ -63,3 +63,7 @@ backup
 
 # linuxdev runtime logs (bootstrap / setup-disks)
 /logs/
+
+# Per-distro env files (setup.ps1 -dockerdisk creates .env.<distroname>)
+.env.*
+!.env.sample

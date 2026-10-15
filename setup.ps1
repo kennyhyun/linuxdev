@@ -33,6 +33,29 @@ If ($args.Contains("-novm")) {
 If ($args.Contains("-importdistro")) {
   $importDistro = 1
 }
+# -distroname <name>: name to register the Store distro under (default: linuxdev)
+$distroName = ""
+for ($i = 0; $i -lt $args.Count - 1; $i++) {
+  if ("$($args[$i])" -ieq "-distroname") { $distroName = "$($args[$i + 1])" }
+}
+# -dockerdisk <size>: docker.vhdx size, e.g. 64G / 64GB / 64 (GB). Also switches to
+# the per-distro env file .env.<distroname> (see "Env file" below).
+$dockerDiskGB = $null
+for ($i = 0; $i -lt $args.Count; $i++) {
+  if ("$($args[$i])" -ieq "-dockerdisk") {
+    $raw = if ($i + 1 -lt $args.Count) { "$($args[$i + 1])" } else { "" }
+    # PowerShell turns a bare 64GB argument into the number 68719476736 (bytes)
+    if ($raw -match '^\s*(\d+)\s*(g|gb)?\s*$') {
+      $n = [long]$matches[1]
+      if ($n -ge 1GB -and ($n % 1GB) -eq 0) { $n = [long]($n / 1GB) }
+      if ($n -ge 1 -and $n -le 65536) { $dockerDiskGB = [int]$n }
+    }
+    if ($null -eq $dockerDiskGB) {
+      Write-Error "Invalid -dockerdisk value '$raw' (use e.g. 64G, 64GB or 64)"
+      exit 1
+    }
+  }
+}
 
 # Legacy flags - keep for backward compat
 If ($args.Contains("-novagrant")) {
@@ -80,12 +103,15 @@ if (-not $hasOptions) {
   Write-Host "   -nogit        skip Git install"
   Write-Host "   -vscode       also install VSCode"
   Write-Host "   -importdistro install the WSL2 distro automatically"
+  Write-Host "   -distroname <name>  name for the Store distro in WSL (default: linuxdev, or WSL_DISTRO_NAME in .env)"
+  Write-Host "   -dockerdisk <size>  docker disk size, e.g. 64G (default 120G). Uses/creates .env.<distroname>"
   Write-Host "   -noconfirm    non-interactive (use .env / defaults, no prompts)"
   Write-Host ""
   Write-Host " Examples:"
   Write-Host "   .\setup.ps1 -wsl                          WSL2, interactive (recommended)"
   Write-Host "   .\setup.ps1 -wsl -noconfirm               WSL2, non-interactive (Store distro, .env defaults)"
   Write-Host "   .\setup.ps1 -wsl -importdistro            WSL2 + custom distro from GitHub Releases"
+  Write-Host "   .\setup.ps1 -wsl -distroname dev2 -dockerdisk 64G   Store distro 'dev2', 64G docker disk (.env.dev2)"
   Write-Host "   .\setup.ps1 -vagrant                      VirtualBox + Vagrant (legacy)"
   Write-Host "   .\setup.ps1 -novm -nodevtools -noconfirm  minimal: tools only"
   Write-Host "================================================"
@@ -113,14 +139,53 @@ if (-not $noConfirm) {
   Read-Host -Prompt "Press Enter to continue or Ctrl+C to stop"
 }
 
-# Load .env if present
+# Env file: .env by default. With -dockerdisk, a per-distro file .env.<distroname>
+# is used instead (created if missing) so several machines can have their own settings.
+$envPath = "$PSScriptRoot\.env"
+if ($null -ne $dockerDiskGB) {
+  if (-not $distroName) {
+    if ($noConfirm) {
+      $distroName = "linuxdev"
+    } else {
+      $in = Read-Host "Distro name [linuxdev]"
+      $distroName = if ([string]::IsNullOrWhiteSpace($in)) { "linuxdev" } else { $in.Trim() }
+    }
+  }
+  if ($distroName -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') {
+    Write-Error "Invalid distro name '$distroName' (use letters, digits, '.', '_', '-')"
+    exit 1
+  }
+  $envPath = "$PSScriptRoot\.env.$distroName"
+  Write-Host "Using env file: $envPath"
+}
+
+# Load env file if present
 $envfile = [ordered]@{}
-$envfileContent = Get-Content "$PSScriptRoot\.env" -ErrorAction SilentlyContinue
+$envfileContent = Get-Content $envPath -ErrorAction SilentlyContinue
 if ($envfileContent) {
   $envfileContent | ForEach-Object {
     $key, $value = $_.split("=")
     if ($key) { $envfile[$key] = $value }
   }
+}
+
+# Set KEY=VALUE in an env file (replace the line if present, else append; creates the file)
+function Set-EnvValue($path, $key, $value) {
+  $lines = @()
+  if (Test-Path $path) { $lines = @(Get-Content $path) }
+  $found = $false
+  $out = @(foreach ($l in $lines) {
+    if ($l -match "^\s*$([regex]::Escape($key))\s*=") { $found = $true; "$key=$value" } else { $l }
+  })
+  if (-not $found) { $out += "$key=$value" }
+  Set-Content -Path $path -Value $out
+  $script:envfile[$key] = "$value"
+}
+
+if ($null -ne $dockerDiskGB) {
+  Set-EnvValue $envPath "DOCKER_SIZE_GB" $dockerDiskGB
+  Set-EnvValue $envPath "WSL_DISTRO_NAME" $distroName
+  Write-Host "  DOCKER_SIZE_GB=$dockerDiskGB, WSL_DISTRO_NAME=$distroName -> $envPath"
 }
 
 # Refresh PATH
@@ -183,7 +248,7 @@ switch ($vmBackend) {
 
     # --- Interactive .env collection (ask only if empty; save to .env) ---
     # To change saved values later, edit or delete .env (or rename it) and re-run.
-    $envPath = "$PSScriptRoot\.env"
+    # $envPath was chosen above (.env, or .env.<distroname> with -dockerdisk)
     function Get-OrAsk($key, $prompt, $default) {
       $cur = $envfile[$key]
       if ($cur) { return $cur }
@@ -211,6 +276,7 @@ switch ($vmBackend) {
     & "$PSScriptRoot\scripts\installers\install-wsl2.ps1" `
         -importDistro:([bool]$importDistro) `
         -noConfirm:([bool]$noConfirm) `
+        -distroName $distroName `
         -envFile $envPath
     if ($LASTEXITCODE -eq 2) {
         # install-wsl2 signalled "reboot required" -- stop here, do not print "Done".

@@ -10,6 +10,7 @@ param(
     [switch]$importDistro,
     [switch]$noConfirm,
     [string]$localImage,
+    [string]$distroName,
     [string]$envFile = "$PSScriptRoot\..\..\.env"
 )
 
@@ -172,7 +173,7 @@ if ($importDistro -or $localImage -or (-not $noConfirm)) {
     Write-Host ""
     Write-Host "Install WSL2 distro?"
     Write-Host "  [1] Skip"
-    Write-Host "  [2] Microsoft Store (Debian)"
+    Write-Host "  [2] Microsoft Store (Debian, imported under a name you choose)"
     Write-Host "  [3] GitHub Releases (linuxdev custom)"
     Write-Host "  [4] Local file (offline)"
     # Non-interactive selection: -importdistro -> GitHub custom; -localImage -> local;
@@ -183,7 +184,26 @@ if ($importDistro -or $localImage -or (-not $noConfirm)) {
               else { Read-Host "Enter choice [1]" }
 
     switch ($choice.Trim()) {
-        "2" { & "$PSScriptRoot\..\wsl\install-distro-store.ps1"  -EnvFile $envFile; $installed = $true; $installedDistro = "Debian" }
+        "2" {
+            # Name to register the Store distro under: -distroName > .env WSL_DISTRO_NAME > prompt > "linuxdev"
+            $storeName = $distroName
+            if (-not $storeName -and (Test-Path $envFile)) {
+                foreach ($line in Get-Content $envFile) {
+                    if ($line -match '^\s*WSL_DISTRO_NAME\s*=\s*(.+?)\s*$') { $storeName = $matches[1].Trim() }
+                }
+            }
+            if (-not $storeName) {
+                if ($noConfirm) {
+                    $storeName = "linuxdev"
+                } else {
+                    $in = Read-Host "Distro name [linuxdev]"
+                    $storeName = if ([string]::IsNullOrWhiteSpace($in)) { "linuxdev" } else { $in.Trim() }
+                }
+            }
+            & "$PSScriptRoot\..\wsl\install-distro-store.ps1" -DistroName $storeName -EnvFile $envFile
+            if ($LASTEXITCODE -ne 0) { Write-Error "Store distro install failed"; exit 1 }
+            $installed = $true; $installedDistro = $storeName
+        }
         "3" { & "$PSScriptRoot\..\wsl\install-distro-github.ps1" -EnvFile $envFile; $installed = $true; $installedDistro = "Linuxdev" }
         "4" {
             $img = if ($localImage) { $localImage } else { Read-Host "Path to .tar or .tar.gz" }

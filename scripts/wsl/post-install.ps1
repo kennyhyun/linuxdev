@@ -18,8 +18,6 @@ param(
 . "$PSScriptRoot\..\common\wsl-utils.ps1"
 
 $linuxdevRoot = "$env:USERPROFILE\linuxdev"
-# Windows path -> WSL mount path
-$wslRoot = "/mnt/c/Users/$env:USERNAME/linuxdev"
 
 # Convert a Windows path (C:\Users\me\x) to a WSL path (/mnt/c/Users/me/x)
 function ConvertTo-WslPath($winPath) {
@@ -30,6 +28,10 @@ function ConvertTo-WslPath($winPath) {
     }
     return ($full -replace '\\','/')
 }
+
+# This repo's root as seen from WSL (the repo can live anywhere, not only
+# C:\Users\<user>\linuxdev): scripts/wsl/post-install.ps1 -> ..\..
+$wslRoot = ConvertTo-WslPath (Resolve-Path "$PSScriptRoot\..\..").Path
 
 # Resolve default user: .env WSL_USERNAME wins over the -DefaultUser default
 if (Test-Path $EnvFile) {
