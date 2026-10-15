@@ -33,6 +33,9 @@ If ($args.Contains("-novm")) {
 If ($args.Contains("-importdistro")) {
   $importDistro = 1
 }
+If ($args.Contains("-noshortcut")) {
+  $noShortcut = 1
+}
 # -distroname <name>: name to register the Store distro under (default: linuxdev)
 $distroName = ""
 for ($i = 0; $i -lt $args.Count - 1; $i++) {
@@ -105,6 +108,7 @@ if (-not $hasOptions) {
   Write-Host "   -importdistro install the WSL2 distro automatically"
   Write-Host "   -distroname <name>  name for the WSL distro (default: linuxdev). Settings: ~/.linuxdev/<name>/.env"
   Write-Host "   -dockerdisk <size>  docker disk size, e.g. 64G (default 120G)"
+  Write-Host "   -noshortcut   don't create the desktop shortcut (htop in the distro)"
   Write-Host "   -noconfirm    non-interactive (use .env / defaults, no prompts)"
   Write-Host ""
   Write-Host " Examples:"
@@ -296,6 +300,7 @@ switch ($vmBackend) {
     & "$PSScriptRoot\scripts\installers\install-wsl2.ps1" `
         -importDistro:([bool]$importDistro) `
         -noConfirm:([bool]$noConfirm) `
+        -noShortcut:([bool]$noShortcut) `
         -distroName $distroName `
         -envFile $envPath
     if ($LASTEXITCODE -eq 2) {

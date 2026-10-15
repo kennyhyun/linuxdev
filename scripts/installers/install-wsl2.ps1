@@ -9,6 +9,7 @@
 param(
     [switch]$importDistro,
     [switch]$noConfirm,
+    [switch]$noShortcut,
     [string]$localImage,
     [string]$distroName,
     [string]$envFile = "$PSScriptRoot\..\..\.env"
@@ -258,6 +259,15 @@ if ($importDistro -or $localImage -or (-not $noConfirm)) {
 # The runner is NOT installed here. It is an optional add-on for turning this
 # machine into a CI runner host. The install lives inside the distro (bash) and
 # the auto-start is a Windows scheduled task -- both are run on demand.
+# Desktop shortcut that runs htop in the new distro (skip with setup.ps1 -noshortcut)
+if ($installed -and -not $noShortcut) {
+    try {
+        & "$PSScriptRoot\..\wsl\create-shortcut.ps1" -DistroName $installedDistro
+    } catch {
+        Write-Warning "Could not create the desktop shortcut: $_"
+    }
+}
+
 Write-Host ""
 Write-Host "----- Optional: GitLab Runner (CI) -----"
 Write-Host "To turn this WSL2 machine into a GitLab CI runner, do this AFTER the"
