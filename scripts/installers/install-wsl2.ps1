@@ -178,7 +178,9 @@ Write-Host "WSL is operational."
 # =============================================
 # Distro install
 # =============================================
-if ($importDistro -or $localImage -or (-not $noConfirm)) {
+# Always runs: with -noconfirm (and no -importdistro / -localImage) the Store
+# distro is installed non-interactively, as documented in setup.ps1's usage.
+if ($true) {
     Write-Host ""
     Write-Host "Install WSL2 distro?"
     Write-Host "  [1] Skip"
