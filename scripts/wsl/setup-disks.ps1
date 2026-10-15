@@ -14,12 +14,14 @@
 #     (rsync) before emptying the rootfs dirs.
 #
 # Sizes come from .env (DATA_SIZE_GB / DOCKER_SIZE_GB = vhdx size, default 64).
-# Disk type comes from .env VHDX_TYPE:
-#   fixed       (default) -- full size is allocated on disk up front. Creation
-#                            takes a while (zero-fill) but avoids runtime growth
-#                            stalls/fragmentation and guarantees the space.
-#   expandable            -- dynamic; starts small and grows as data is written
-#                            ("dynamic" is accepted as an alias).
+# Disk types come from .env, per disk (default: docker=fixed, data=expandable):
+#   DOCKER_VHDX_TYPE / DATA_VHDX_TYPE  (fixed | expandable)
+#   VHDX_TYPE                          (optional: applies to any disk without its own key)
+#   fixed       -- full size is allocated on disk up front. Creation takes a
+#                  while (zero-fill) but avoids runtime growth stalls /
+#                  fragmentation and guarantees the space.
+#   expandable  -- dynamic; starts small and grows as data is written
+#                  ("dynamic" is accepted as an alias).
 #
 # Usage (Admin PowerShell):
 #   .\scripts\wsl\setup-disks.ps1 -DistroName Debian
@@ -58,24 +60,33 @@ function Get-EnvSizeGB {
 $DataSizeGB   = Get-EnvSizeGB "DATA_SIZE_GB"   64
 $DockerSizeGB = Get-EnvSizeGB "DOCKER_SIZE_GB" 64
 
-# --- read VHDX_TYPE from .env: fixed (default) | expandable ---
-function Get-EnvVhdxType {
-    $val = "fixed"
+# --- read a vhdx type from .env: fixed | expandable ---
+# Precedence: <Key> (DATA_VHDX_TYPE / DOCKER_VHDX_TYPE) > VHDX_TYPE > $Default
+function Get-EnvRaw {
+    param([string]$Key)
+    $val = ""
     if (Test-Path $EnvFile) {
         foreach ($line in Get-Content $EnvFile) {
-            if ($line -match "^\s*VHDX_TYPE\s*=\s*([A-Za-z]*)\s*(#.*)?$") {
-                if ($matches[1]) { $val = $matches[1].ToLower() }
-            }
+            if ($line -match "^\s*$Key\s*=\s*([A-Za-z]*)\s*(#.*)?$") { $val = $matches[1].ToLower() }
         }
     }
+    return $val
+}
+function Get-EnvVhdxType {
+    param([string]$Key, [string]$Default)
+    $val = Get-EnvRaw $Key
+    if (-not $val) { $val = Get-EnvRaw "VHDX_TYPE" }
+    if (-not $val) { $val = $Default }
     switch ($val) {
         "fixed"      { return "fixed" }
         "expandable" { return "expandable" }
         "dynamic"    { return "expandable" }
-        default      { Write-Error "Invalid VHDX_TYPE='$val' in $EnvFile (use fixed or expandable)"; exit 1 }
+        default      { Write-Error "Invalid vhdx type '$val' for $Key/VHDX_TYPE in $EnvFile (use fixed or expandable)"; exit 1 }
     }
 }
-$VhdxType = Get-EnvVhdxType
+# Defaults: docker.vhdx fixed (heavy writes, big), data.vhdx expandable (/var, /home)
+$DataType   = Get-EnvVhdxType "DATA_VHDX_TYPE"   "expandable"
+$DockerType = Get-EnvVhdxType "DOCKER_VHDX_TYPE" "fixed"
 
 $dataVhdx   = Join-Path $DiskDir "data.vhdx"
 $dockerVhdx = Join-Path $DiskDir "docker.vhdx"
@@ -86,9 +97,8 @@ Write-Host "========================================"
 Write-Host " Linuxdev WSL2 disk setup (A1: data + docker)"
 Write-Host " Distro : $DistroName"
 Write-Host " DiskDir: $DiskDir"
-Write-Host " type   : $VhdxType"
-Write-Host " data   : ${DataSizeGB}G"
-Write-Host " docker : ${DockerSizeGB}G"
+Write-Host " data   : ${DataSizeGB}G ($DataType)"
+Write-Host " docker : ${DockerSizeGB}G ($DockerType)"
 if ($WhatIf) { Write-Host " MODE   : DRY RUN (no changes)" }
 Write-Host "========================================"
 
@@ -136,11 +146,11 @@ function Invoke-Step {
     & $Action
 }
 
-# --- diskpart helper to create an empty vhdx ($VhdxType: fixed | expandable) ---
+# --- diskpart helper to create an empty vhdx (-Type: fixed | expandable) ---
 function New-EmptyVhdx {
-    param([string]$Path, [int]$SizeGB)
+    param([string]$Path, [int]$SizeGB, [string]$Type)
     $sizeMB = [long]$SizeGB * 1024
-    $script = "create vdisk file=`"$Path`" maximum=$sizeMB type=$VhdxType"
+    $script = "create vdisk file=`"$Path`" maximum=$sizeMB type=$Type"
     $tmp = "$env:TEMP\linuxdev-disk-create.txt"
     $script | Set-Content $tmp -Encoding ASCII
     diskpart /s $tmp | Out-Null
@@ -149,12 +159,14 @@ function New-EmptyVhdx {
 }
 
 # --- fixed disks allocate everything up front: make sure there is room ---
-if ($VhdxType -eq "fixed" -and -not $WhatIf) {
+$needGB = 0
+if ($DataType   -eq "fixed") { $needGB += $DataSizeGB }
+if ($DockerType -eq "fixed") { $needGB += $DockerSizeGB }
+if ($needGB -gt 0 -and -not $WhatIf) {
     $driveName = (Split-Path -Qualifier (Resolve-Path $DiskDir).Path).TrimEnd(':')
     $freeGB    = [math]::Floor((Get-PSDrive -Name $driveName).Free / 1GB)
-    $needGB    = $DataSizeGB + $DockerSizeGB
     if ($freeGB -lt $needGB) {
-        Write-Error "Not enough free space on ${driveName}: for fixed disks (need ${needGB}G, free ${freeGB}G). Lower DATA_SIZE_GB/DOCKER_SIZE_GB or set VHDX_TYPE=expandable in $EnvFile."
+        Write-Error "Not enough free space on ${driveName}: for fixed disks (need ${needGB}G, free ${freeGB}G). Lower the *_SIZE_GB or use expandable (DATA_VHDX_TYPE / DOCKER_VHDX_TYPE / VHDX_TYPE) in $EnvFile."
         exit 1
     }
     Write-Host "Fixed disks: allocating ${needGB}G up front (free on ${driveName}: ${freeGB}G). This can take several minutes."
@@ -171,12 +183,12 @@ Invoke-Step "Terminating $DistroName" {
 # =====================================================================
 # Step 2: create empty data/docker vhdx (max cap)
 # =====================================================================
-Invoke-Step "Creating data.vhdx [${DataSizeGB}G]" {
-    New-EmptyVhdx -Path $dataVhdx -SizeGB $DataSizeGB
+Invoke-Step "Creating data.vhdx [${DataSizeGB}G, $DataType]" {
+    New-EmptyVhdx -Path $dataVhdx -SizeGB $DataSizeGB -Type $DataType
     Write-Host "   created: $dataVhdx"
 }
-Invoke-Step "Creating docker.vhdx [${DockerSizeGB}G]" {
-    New-EmptyVhdx -Path $dockerVhdx -SizeGB $DockerSizeGB
+Invoke-Step "Creating docker.vhdx [${DockerSizeGB}G, $DockerType]" {
+    New-EmptyVhdx -Path $dockerVhdx -SizeGB $DockerSizeGB -Type $DockerType
     Write-Host "   created: $dockerVhdx"
 }
 

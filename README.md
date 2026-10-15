@@ -272,13 +272,15 @@ Writable data lives on **separate rw vhdx volumes** (so rootfs stays read-only):
 | docker.vhdx | /var/lib/docker | 50 GB |
 | brew.vhdx | /home/linuxbrew | 10 GB |
 
-The vhdx files (`data.vhdx`, `docker.vhdx`) are created as **fixed-size** disks by
-default (the full size is allocated on the host up front, so creation takes a
-while). To use dynamically expanding disks instead (near-zero on disk until
-used), set this in `.env` before running setup:
+`docker.vhdx` is created as a **fixed-size** disk by default (the full size is
+allocated on the host up front, so creation takes a while), while `data.vhdx`
+(`/var`, `/home`) is dynamically expanding. Override per disk in `.env` before
+running setup:
 
 ```
-VHDX_TYPE=expandable   # fixed (default) | expandable
+DOCKER_VHDX_TYPE=fixed        # fixed (default) | expandable
+DATA_VHDX_TYPE=expandable     # expandable (default) | fixed
+# VHDX_TYPE=fixed             # optional: applies to any disk without its own key
 ```
 
 Create/attach them (recommended for a runner host) with:
