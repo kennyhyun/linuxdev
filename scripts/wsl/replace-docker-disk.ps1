@@ -5,8 +5,9 @@
 
 .DESCRIPTION
     Keeps the old disk as docker.vhdx.bak, creates a new fixed-size docker.vhdx,
-    formats it as ext4 with the label "linuxdev-docker" (the label the
-    var-lib-docker.mount unit looks for), then restarts via reboot.ps1.
+    formats it as ext4 with the distro's docker label ("<DistroName>-docker", the
+    label the var-lib-docker.mount unit of that distro looks for), then restarts
+    via reboot.ps1.
 
     data.vhdx (/var, /home) is NOT touched.
     Docker images, containers and the build cache are discarded -- the first
@@ -45,6 +46,7 @@ $ErrorActionPreference = "Stop"
 . "$PSScriptRoot\..\common\wsl-utils.ps1"
 if (-not $DiskDir) { $DiskDir = Get-LinuxdevDir $DistroName "disks" }
 if (-not $TaskName) { $TaskName = "LinuxdevWSLKeepAlive-$DistroName" }
+$dockerLabel = Get-LinuxdevDiskLabel $DistroName "docker"
 
 $docker = Join-Path $DiskDir "docker.vhdx"
 $bak    = "$docker.bak"
@@ -77,7 +79,7 @@ if (-not (Test-Path $docker)) {
 }
 
 # 3) attach the new disk inside a live session and format it with the label
-Write-Host ">> Formatting the new disk (label: linuxdev-docker)"
+Write-Host ">> Formatting the new disk (label: $dockerLabel)"
 $job = Start-Job { wsl -d $args[0] -u root -- sleep 600 } -ArgumentList $DistroName
 try {
     Start-Sleep -Seconds 3
@@ -90,9 +92,9 @@ try {
     $dev  = "/dev/$($new[0])"
     $type = (wsl -d $DistroName -u root -- bash -c "blkid -o value -s TYPE $dev") -join ""
     if ($type) { throw "$dev already has a filesystem ($type); refusing to format." }
-    wsl -d $DistroName -u root -- mkfs.ext4 -q -L linuxdev-docker -F $dev
+    wsl -d $DistroName -u root -- mkfs.ext4 -q -L $dockerLabel -F $dev
     if ($LASTEXITCODE -ne 0) { throw "mkfs.ext4 failed" }
-    Write-Host "   formatted $dev as ext4 [linuxdev-docker]"
+    Write-Host "   formatted $dev as ext4 [$dockerLabel]"
 } finally {
     Stop-Job $job -ErrorAction SilentlyContinue
     Remove-Job $job -ErrorAction SilentlyContinue

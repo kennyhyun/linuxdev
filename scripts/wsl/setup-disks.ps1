@@ -93,6 +93,8 @@ $DockerType = Get-EnvVhdxType "DOCKER_VHDX_TYPE" "fixed"
 
 $dataVhdx   = Join-Path $DiskDir "data.vhdx"
 $dockerVhdx = Join-Path $DiskDir "docker.vhdx"
+$dataLabel   = Get-LinuxdevDiskLabel $DistroName "data"
+$dockerLabel = Get-LinuxdevDiskLabel $DistroName "docker"
 
 New-Item -ItemType Directory -Force -Path $DiskDir | Out-Null
 
@@ -100,8 +102,8 @@ Write-Host "========================================"
 Write-Host " Linuxdev WSL2 disk setup (A1: data + docker)"
 Write-Host " Distro : $DistroName"
 Write-Host " DiskDir: $DiskDir"
-Write-Host " data   : ${DataSizeGB}G ($DataType)"
-Write-Host " docker : ${DockerSizeGB}G ($DockerType)"
+Write-Host " data   : ${DataSizeGB}G ($DataType)  label: $dataLabel"
+Write-Host " docker : ${DockerSizeGB}G ($DockerType)  label: $dockerLabel"
 if ($WhatIf) { Write-Host " MODE   : DRY RUN (no changes)" }
 Write-Host "========================================"
 
@@ -210,8 +212,42 @@ Write-Host ">> Formatting + seeding inside $DistroName ..."
 $job = Start-Job { wsl -d $args[0] -u root -- sleep 600 } -ArgumentList $DistroName
 Start-Sleep -Seconds 3
 
-foreach ($v in @($dataVhdx, $dockerVhdx)) {
-    if (Test-Path $v) { wsl --mount --vhd $v --bare 2>&1 | Out-Null; Start-Sleep -Milliseconds 500 }
+# The role of each disk is decided HERE, from the file it came from -- never from
+# the order of /dev/sd* in the VM. All distros share one WSL2 VM, so stale disks
+# attached by earlier runs are visible too and must not be mistaken for ours.
+# Attach one vhdx at a time and take the single block device that appears.
+function Get-BlockDevs {
+    @(wsl -d $DistroName -u root -- bash -c "lsblk -dnro NAME") |
+        ForEach-Object { "$_".Trim() } | Where-Object { $_ }
+}
+function Mount-VhdxGetDev {
+    param([string]$Path)
+    wsl --unmount $Path 2>$null | Out-Null      # drop a stale attach so it shows up as a NEW device
+    Start-Sleep -Seconds 1
+    $before = @(Get-BlockDevs)
+    wsl --mount --vhd $Path --bare 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "wsl --mount failed for $Path (still in use? try: wsl --unmount `"$Path`", or wsl --shutdown)"
+    }
+    Start-Sleep -Seconds 2
+    $after = @(Get-BlockDevs)
+    $new = @($after | Where-Object { $before -notcontains $_ })
+    if ($new.Count -ne 1) {
+        throw "Expected exactly 1 new block device after attaching $Path, found: $($new -join ',')"
+    }
+    return "/dev/$($new[0])"
+}
+
+try {
+    $dataDev   = Mount-VhdxGetDev $dataVhdx
+    Write-Host "   data.vhdx   -> $dataDev"
+    $dockerDev = Mount-VhdxGetDev $dockerVhdx
+    Write-Host "   docker.vhdx -> $dockerDev"
+} catch {
+    Stop-Job $job -ErrorAction SilentlyContinue
+    Remove-Job $job -ErrorAction SilentlyContinue
+    Write-Error "$_"
+    exit 1
 }
 
 # This repo's root as seen from WSL (the repo can live anywhere):
@@ -224,8 +260,10 @@ New-Item -ItemType Directory -Force -Path $winLogDir | Out-Null
 $wslLogFile = "$wslRepo/logs/setup-disks-$logStamp.log"
 Write-Host "   log: $winLogDir\setup-disks-$logStamp.log"
 wsl -d $DistroName -u root -- bash "$wslRepo/scripts/wsl/setup-disks.sh" `
-    --data-label linuxdev-data `
-    --docker-label linuxdev-docker `
+    --data-dev $dataDev `
+    --docker-dev $dockerDev `
+    --data-label $dataLabel `
+    --docker-label $dockerLabel `
     --log-file $wslLogFile
 $rc = $LASTEXITCODE
 

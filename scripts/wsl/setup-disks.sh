@@ -9,7 +9,7 @@
 #   0. REQUIRES rsync. If missing, abort without touching anything.
 #   1. Stop the linuxdev .mount units so a pending start job cannot mount the
 #      new volume onto /var and /home the moment it gets its label.
-#   2. Format data(linuxdev-data) and docker(linuxdev-docker).
+#   2. Format data(<distro>-data) and docker(<distro>-docker).
 #   3. Mount the ROOTFS BLOCK DEVICE a second time at a private path. All reads
 #      (seed source) and all deletes (emptying the rootfs) go through this
 #      mount, never through the live /var and /home paths, which may be bind
@@ -22,11 +22,19 @@
 # /home/linuxbrew lives inside the data volume -- no separate brew volume.
 #
 # Usage (invoked by setup-disks.ps1):
-#   setup-disks.sh --data-label linuxdev-data --docker-label linuxdev-docker \
+#   setup-disks.sh --data-dev /dev/sdX --docker-dev /dev/sdY \
+#                  --data-label <distro>-data --docker-label <distro>-docker \
 #                  [--log-file <path>]
+#
+# The devices are passed in explicitly (setup-disks.ps1 attaches the two vhdx one
+# at a time and reports the device each one became). They are NEVER guessed from
+# /dev/sd* order: all distros share one WSL2 VM, so stale empty disks left over
+# from earlier runs can be present, and a guess formats the wrong disk.
 
 set -euo pipefail
 
+DATA_DEV=""
+DOCKER_DEV=""
 DATA_LABEL="linuxdev-data"
 DOCKER_LABEL="linuxdev-docker"
 LOG_FILE=""
@@ -37,6 +45,8 @@ MOUNT_UNITS="var-lib-docker.mount home.mount var.mount mnt-data.mount"
 
 while [ $# -gt 0 ]; do
     case "$1" in
+        --data-dev)       DATA_DEV="$2";       shift 2 ;;
+        --docker-dev)     DOCKER_DEV="$2";     shift 2 ;;
         --data-label)     DATA_LABEL="$2";     shift 2 ;;
         --docker-label)   DOCKER_LABEL="$2";   shift 2 ;;
         --log-file)       LOG_FILE="$2";       shift 2 ;;
@@ -95,6 +105,27 @@ log "rootfs device: $ROOT_DEV"
 [ -b "$ROOT_DEV" ] || die "rootfs device '$ROOT_DEV' is not a block device"
 
 # ---------------------------------------------------------------------
+# Step 0b: validate the devices we were given (before anything is touched).
+# They are never guessed from /dev/sd* order.
+# ---------------------------------------------------------------------
+[ -n "$DATA_DEV" ] && [ -n "$DOCKER_DEV" ] || { log "ERROR: --data-dev and --docker-dev are required"; exit 2; }
+[ "$DATA_DEV" != "$DOCKER_DEV" ] || die "--data-dev and --docker-dev are the same device ($DATA_DEV)"
+for d in "$DATA_DEV" "$DOCKER_DEV"; do
+    [ -b "$d" ] || die "$d is not a block device"
+    [ "$d" != "$ROOT_DEV" ] || die "$d is the rootfs device"
+    fstype="$(blkid -o value -s TYPE "$d" 2>/dev/null || true)"
+    [ -z "$fstype" ] || die "$d already has a filesystem ($fstype); refusing to format it"
+done
+# The .mount units find the volumes by label, and all distros share one VM: a
+# second disk with the same label would make them mount the wrong one.
+for pair in "$DATA_LABEL|$DATA_DEV" "$DOCKER_LABEL|$DOCKER_DEV"; do
+    label="${pair%%|*}"
+    other="$(blkid -L "$label" 2>/dev/null || true)"
+    [ -z "$other" ] || die "label '$label' is already used by $other (another distro or an old disk). Detach it (wsl --unmount / wsl --shutdown) or use a different distro name."
+done
+log "data device: $DATA_DEV [$DATA_LABEL]   docker device: $DOCKER_DEV [$DOCKER_LABEL]"
+
+# ---------------------------------------------------------------------
 # Step 1: keep the .mount units from grabbing the new volume
 # ---------------------------------------------------------------------
 # On this boot the units are waiting for LABEL=linuxdev-data to appear; as soon
@@ -111,26 +142,6 @@ for p in /var /home; do
     log "diag: $p backing device before format = ${dev:-?}"
     [ "$dev" = "$ROOT_DEV" ] || die "$p is not on the rootfs ($dev). Detach data disks / reboot and retry."
 done
-
-# Collect unformatted whole disks (the fresh data/docker vhdx).
-EMPTY_DEVS=()
-for d in /dev/sd*; do
-    [ -b "$d" ] || continue
-    echo "$d" | grep -qE 'sd[a-z][0-9]' && continue   # skip partitions
-    [ "$d" = "$ROOT_DEV" ] && continue                 # skip rootfs
-    fstype="$(blkid -o value -s TYPE "$d" 2>/dev/null || true)"
-    [ -n "$fstype" ] && continue                       # skip already-formatted
-    EMPTY_DEVS+=("$d")
-done
-
-if [ "${#EMPTY_DEVS[@]}" -lt 2 ]; then
-    log "ERROR: expected 2 empty disks (data, docker), found ${#EMPTY_DEVS[@]}: ${EMPTY_DEVS[*]:-<none>}"
-    exit 1
-fi
-log "empty devices: ${EMPTY_DEVS[*]}"
-
-DATA_DEV="${EMPTY_DEVS[0]}"
-DOCKER_DEV="${EMPTY_DEVS[1]}"
 
 # ---------------------------------------------------------------------
 # Step 2: format
@@ -220,6 +231,20 @@ rmdir "$DATA_MNT" 2>/dev/null || true
 
 # Empty the rootfs copies through the private mount only (never the live paths).
 mount -o remount,bind,rw "$ROOTFS_SRC" || die "could not make $ROOTFS_SRC writable for cleanup"
+
+# Point this distro's mount units at THIS distro's labels (drop-ins override the
+# default What=LABEL=linuxdev-* in the unit files). Written through the private
+# rootfs mount because the live /etc may already be bind-mounted read-only.
+write_label_dropin() {
+    local unit="$1" label="$2" d="$ROOTFS_SRC/etc/systemd/system/$1.d"
+    mkdir -p "$d"
+    printf '[Mount]\nWhat=LABEL=%s\n' "$label" > "$d/10-linuxdev-label.conf"
+    log "  $unit -> What=LABEL=$label"
+}
+log "Pointing the mount units at this distro's labels"
+write_label_dropin mnt-data.mount       "$DATA_LABEL"
+write_label_dropin var-lib-docker.mount "$DOCKER_LABEL"
+systemctl daemon-reload 2>/dev/null || true
 shopt -s dotglob nullglob
 log "Emptying rootfs home/ (via $ROOTFS_SRC)"
 for entry in "$ROOTFS_SRC/home/"*; do

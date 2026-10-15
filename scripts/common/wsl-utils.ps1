@@ -87,3 +87,20 @@ function Add-7ZipToPath {
     $dir = Split-Path $Exe -Parent
     if (($env:Path -split ';') -notcontains $dir) { $env:Path = "$env:Path;$dir" }
 }
+
+# Filesystem label of a distro's data/docker volume: "<DistroName>-<role>".
+# All WSL2 distros share ONE VM and see every attached disk, so the label is what
+# tells the distros' .mount units apart. ext4 labels are limited to 16 bytes: a
+# long distro name is shortened (the role suffix is always kept).
+#   Get-LinuxdevDiskLabel linuxdev data    -> linuxdev-data
+#   Get-LinuxdevDiskLabel linuxdev docker  -> linuxdev-docker
+function Get-LinuxdevDiskLabel {
+    param(
+        [Parameter(Mandatory)][string]$DistroName,
+        [Parameter(Mandatory)][ValidateSet("data", "docker")][string]$Role
+    )
+    $suffix = "-$Role"
+    $max = 16 - $suffix.Length
+    $base = if ($DistroName.Length -gt $max) { $DistroName.Substring(0, $max) } else { $DistroName }
+    return "$base$suffix"
+}
