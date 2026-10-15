@@ -24,10 +24,10 @@
     New disk size in GB (fixed, allocated up front). Default: 120.
 
 .PARAMETER DiskDir
-    Folder containing docker.vhdx. Default: %USERPROFILE%\linuxdev\disks
+    Folder containing docker.vhdx. Default: %USERPROFILE%\.linuxdev\<DistroName>\disks
 
 .PARAMETER TaskName
-    Keep-alive scheduled task. Default: LinuxdevWSLKeepAlive.
+    Keep-alive scheduled task. Default: LinuxdevWSLKeepAlive-<DistroName>.
 
 .EXAMPLE
     .\scripts\wsl\replace-docker-disk.ps1 -DistroName Debian
@@ -37,10 +37,14 @@
 param(
     [Parameter(Mandatory = $true)][string]$DistroName,
     [int]$SizeGB      = 120,
-    [string]$DiskDir  = "$env:USERPROFILE\linuxdev\disks",
-    [string]$TaskName = "LinuxdevWSLKeepAlive"
+    [string]$DiskDir  = "",   # default: %USERPROFILE%\.linuxdev\<DistroName>\disks
+    [string]$TaskName = ""   # default: LinuxdevWSLKeepAlive-<DistroName>
 )
 $ErrorActionPreference = "Stop"
+
+. "$PSScriptRoot\..\common\wsl-utils.ps1"
+if (-not $DiskDir) { $DiskDir = Get-LinuxdevDir $DistroName "disks" }
+if (-not $TaskName) { $TaskName = "LinuxdevWSLKeepAlive-$DistroName" }
 
 $docker = Join-Path $DiskDir "docker.vhdx"
 $bak    = "$docker.bak"

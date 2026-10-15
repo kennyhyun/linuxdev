@@ -6,8 +6,8 @@
 
 param(
     [string]$DistroName = "",
-    [string]$DiskDir    = "$env:USERPROFILE\linuxdev\disks",
-    [string]$DistroDir  = "$env:USERPROFILE\linuxdev\distro",
+    [string]$DiskDir    = "",   # default: %USERPROFILE%\.linuxdev\<DistroName>\disks
+    [string]$DistroDir  = "",   # default: %USERPROFILE%\.linuxdev\<DistroName>\distro
     [switch]$Volumes    # Also delete vhdx data disks (home/docker/brew)
 )
 
@@ -37,6 +37,9 @@ if (-not (Test-WslDistroExists $DistroName)) {
     Write-Error "Distro '$DistroName' not found."
     exit 1
 }
+
+if (-not $DiskDir)   { $DiskDir   = Get-LinuxdevDir $DistroName "disks" }
+if (-not $DistroDir) { $DistroDir = Get-LinuxdevDir $DistroName "distro" }
 
 # Final confirmation
 Write-Host ""
@@ -76,6 +79,21 @@ Write-Host "Unregistering $DistroName..."
 wsl --unregister $DistroName
 if ($LASTEXITCODE -ne 0) {
     Write-Host "WARNING: wsl --unregister returned error (may already be gone)"
+}
+
+# Remove the per-distro keep-alive task and launcher (registered by register-autostart.ps1)
+$keepAliveTask = "LinuxdevWSLKeepAlive-$DistroName"
+try {
+    if (Get-ScheduledTask -TaskName $keepAliveTask -ErrorAction SilentlyContinue) {
+        Unregister-ScheduledTask -TaskName $keepAliveTask -Confirm:$false -ErrorAction Stop
+        Write-Host "Removed scheduled task '$keepAliveTask'."
+    }
+} catch {
+    Write-Host "WARNING: could not remove scheduled task '$keepAliveTask' (run as admin?): $_"
+}
+foreach ($f in @("keepalive.vbs", "keepalive.cmd")) {
+    $p = Join-Path (Get-LinuxdevDir $DistroName) $f
+    if (Test-Path $p) { Remove-Item $p -Force }
 }
 
 # Delete vhdx disk files (only with -Volumes)

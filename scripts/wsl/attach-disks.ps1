@@ -7,9 +7,13 @@
 #   .\scripts\wsl\attach-disks.ps1 -SkipBrew
 
 param(
-    [string]$DiskDir  = "$env:USERPROFILE\linuxdev\disks",
+    [string]$DistroName = "Linuxdev",
+    [string]$DiskDir    = "",   # default: %USERPROFILE%\.linuxdev\<DistroName>\disks
     [switch]$SkipBrew
 )
+
+. "$PSScriptRoot\..\common\wsl-utils.ps1"
+if (-not $DiskDir) { $DiskDir = Get-LinuxdevDir $DistroName "disks" }
 
 $disks = @("home.vhdx", "docker.vhdx")
 if (-not $SkipBrew) { $disks += "brew.vhdx" }

@@ -205,7 +205,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 - Enables the WSL2 Windows features (WSL, VirtualMachinePlatform, HypervisorPlatform)
 - Installs 7-Zip and GitHub CLI
-- Collects settings interactively and saves them to `.env` (see table below)
+- Collects settings interactively and saves them to `%USERPROFILE%\.linuxdev\<distroname>\.env` (see table below)
 - Writes `%USERPROFILE%\.wslconfig` (memory/CPU/swap/auto-reclaim)
 - Installs a distro (Microsoft Store / GitHub Releases / local file)
 - Automatically runs `bootstrap-wsl.sh` inside the distro (non-interactive)
@@ -274,7 +274,11 @@ Writable data lives on **separate rw vhdx volumes** (so rootfs stays read-only):
 
 `docker.vhdx` is created as a **fixed-size** disk by default (the full size is
 allocated on the host up front, so creation takes a while), while `data.vhdx`
-(`/var`, `/home`) is dynamically expanding. Override per disk in `.env` before
+(`/var`, `/home`) is dynamically expanding. The disks live per distro in
+`%USERPROFILE%\.linuxdev\<distroname>\disks` (the distro itself in `...\distro`).
+Set the docker disk size with `setup.ps1 -wsl -distroname <name> -dockerdisk 64G`.
+Settings are kept per distro in `%USERPROFILE%\.linuxdev\<name>\.env` (created on
+first run, seeded from the repo's `.env` if there is one). Override per disk there before
 running setup:
 
 ```

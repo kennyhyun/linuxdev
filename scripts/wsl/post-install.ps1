@@ -9,15 +9,15 @@
 param(
     [string]$DistroName = "Linuxdev",
     [string]$DefaultUser = "linuxdev",
-    [string]$EnvFile = "$env:USERPROFILE\linuxdev\.env",
-    [string]$DiskDir = "$env:USERPROFILE\linuxdev\disks",
+    [string]$EnvFile = "$PSScriptRoot\..\..\.env",
+    [string]$DiskDir = "",   # default: %USERPROFILE%\.linuxdev\<DistroName>\disks
     [switch]$SkipDisks,
     [switch]$NoConfirm
 )
 
 . "$PSScriptRoot\..\common\wsl-utils.ps1"
 
-$linuxdevRoot = "$env:USERPROFILE\linuxdev"
+if (-not $DiskDir) { $DiskDir = Get-LinuxdevDir $DistroName "disks" }
 
 # Convert a Windows path (C:\Users\me\x) to a WSL path (/mnt/c/Users/me/x)
 function ConvertTo-WslPath($winPath) {

@@ -12,12 +12,14 @@ param(
     [string]$Distro = "Debian",
     [string]$DistroName = "linuxdev",
     [string]$DefaultUser = "linuxdev",
-    [string]$DistroDir = "$env:USERPROFILE\linuxdev\distro",
+    [string]$DistroDir = "",   # default: %USERPROFILE%\.linuxdev\<DistroName>\distro
     [string]$EnvFile = "$PSScriptRoot\..\..\.env",
     [switch]$SkipPostInstall
 )
 
 . "$PSScriptRoot\..\common\wsl-utils.ps1"
+
+if (-not $DistroDir) { $DistroDir = Get-LinuxdevDir $DistroName "distro" }
 
 if (-not $DistroName) { $DistroName = "linuxdev" }
 if ($DistroName -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') {

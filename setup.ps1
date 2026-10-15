@@ -38,8 +38,8 @@ $distroName = ""
 for ($i = 0; $i -lt $args.Count - 1; $i++) {
   if ("$($args[$i])" -ieq "-distroname") { $distroName = "$($args[$i + 1])" }
 }
-# -dockerdisk <size>: docker.vhdx size, e.g. 64G / 64GB / 64 (GB). Also switches to
-# the per-distro env file .env.<distroname> (see "Env file" below).
+# -dockerdisk <size>: docker.vhdx size, e.g. 64G / 64GB / 64 (GB). Written to the
+# per-distro env file ~/.linuxdev/<distroname>/.env (WSL backend only).
 $dockerDiskGB = $null
 for ($i = 0; $i -lt $args.Count; $i++) {
   if ("$($args[$i])" -ieq "-dockerdisk") {
@@ -103,15 +103,15 @@ if (-not $hasOptions) {
   Write-Host "   -nogit        skip Git install"
   Write-Host "   -vscode       also install VSCode"
   Write-Host "   -importdistro install the WSL2 distro automatically"
-  Write-Host "   -distroname <name>  name for the Store distro in WSL (default: linuxdev, or WSL_DISTRO_NAME in .env)"
-  Write-Host "   -dockerdisk <size>  docker disk size, e.g. 64G (default 120G). Uses/creates .env.<distroname>"
+  Write-Host "   -distroname <name>  name for the WSL distro (default: linuxdev). Settings: ~/.linuxdev/<name>/.env"
+  Write-Host "   -dockerdisk <size>  docker disk size, e.g. 64G (default 120G)"
   Write-Host "   -noconfirm    non-interactive (use .env / defaults, no prompts)"
   Write-Host ""
   Write-Host " Examples:"
   Write-Host "   .\setup.ps1 -wsl                          WSL2, interactive (recommended)"
   Write-Host "   .\setup.ps1 -wsl -noconfirm               WSL2, non-interactive (Store distro, .env defaults)"
   Write-Host "   .\setup.ps1 -wsl -importdistro            WSL2 + custom distro from GitHub Releases"
-  Write-Host "   .\setup.ps1 -wsl -distroname dev2 -dockerdisk 64G   Store distro 'dev2', 64G docker disk (.env.dev2)"
+  Write-Host "   .\setup.ps1 -wsl -distroname dev2 -dockerdisk 64G   distro 'dev2', 64G docker disk (~/.linuxdev/dev2/.env)"
   Write-Host "   .\setup.ps1 -vagrant                      VirtualBox + Vagrant (legacy)"
   Write-Host "   .\setup.ps1 -novm -nodevtools -noconfirm  minimal: tools only"
   Write-Host "================================================"
@@ -139,25 +139,9 @@ if (-not $noConfirm) {
   Read-Host -Prompt "Press Enter to continue or Ctrl+C to stop"
 }
 
-# Env file: .env by default. With -dockerdisk, a per-distro file .env.<distroname>
-# is used instead (created if missing) so several machines can have their own settings.
+# Default env file: repo .env (used by the Vagrant backend, and as the template that
+# seeds the per-distro file ~/.linuxdev/<distroname>/.env for the WSL backend).
 $envPath = "$PSScriptRoot\.env"
-if ($null -ne $dockerDiskGB) {
-  if (-not $distroName) {
-    if ($noConfirm) {
-      $distroName = "linuxdev"
-    } else {
-      $in = Read-Host "Distro name [linuxdev]"
-      $distroName = if ([string]::IsNullOrWhiteSpace($in)) { "linuxdev" } else { $in.Trim() }
-    }
-  }
-  if ($distroName -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') {
-    Write-Error "Invalid distro name '$distroName' (use letters, digits, '.', '_', '-')"
-    exit 1
-  }
-  $envPath = "$PSScriptRoot\.env.$distroName"
-  Write-Host "Using env file: $envPath"
-}
 
 # Load env file if present
 $envfile = [ordered]@{}
@@ -180,12 +164,6 @@ function Set-EnvValue($path, $key, $value) {
   if (-not $found) { $out += "$key=$value" }
   Set-Content -Path $path -Value $out
   $script:envfile[$key] = "$value"
-}
-
-if ($null -ne $dockerDiskGB) {
-  Set-EnvValue $envPath "DOCKER_SIZE_GB" $dockerDiskGB
-  Set-EnvValue $envPath "WSL_DISTRO_NAME" $distroName
-  Write-Host "  DOCKER_SIZE_GB=$dockerDiskGB, WSL_DISTRO_NAME=$distroName -> $envPath"
 }
 
 # Refresh PATH
@@ -240,6 +218,10 @@ if (-not $vmBackend) {
   }
 }
 
+if ($null -ne $dockerDiskGB -and $vmBackend -ne "wsl") {
+  Write-Warning "-dockerdisk only applies to the WSL backend (-wsl); ignored."
+}
+
 switch ($vmBackend) {
 
   "wsl" {
@@ -248,7 +230,45 @@ switch ($vmBackend) {
 
     # --- Interactive .env collection (ask only if empty; save to .env) ---
     # To change saved values later, edit or delete .env (or rename it) and re-run.
-    # $envPath was chosen above (.env, or .env.<distroname> with -dockerdisk)
+    # --- per-distro env file: ~/.linuxdev/<distroname>/.env ---
+    # Created on first use, seeded from the repo .env (common defaults) if present.
+    # From here on this file is the one read/written and passed to every script.
+    . "$PSScriptRoot\scripts\common\wsl-utils.ps1"
+    if (-not $distroName) {
+      if ($noConfirm) {
+        $distroName = "linuxdev"
+      } else {
+        $in = Read-Host "Distro name [linuxdev]"
+        $distroName = if ([string]::IsNullOrWhiteSpace($in)) { "linuxdev" } else { $in.Trim() }
+      }
+    }
+    if ($distroName -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') {
+      Write-Error "Invalid distro name '$distroName' (use letters, digits, '.', '_', '-')"
+      exit 1
+    }
+    $distroHome = Get-LinuxdevDir $distroName
+    $envPath = Join-Path $distroHome ".env"
+    New-Item -ItemType Directory -Force -Path $distroHome | Out-Null
+    if (-not (Test-Path $envPath)) {
+      if (Test-Path "$PSScriptRoot\.env") {
+        Copy-Item "$PSScriptRoot\.env" $envPath
+        Write-Host "Created $envPath (copied from repo .env)"
+      } else {
+        New-Item -ItemType File -Path $envPath | Out-Null
+        Write-Host "Created $envPath"
+      }
+    }
+    Write-Host "Using env file: $envPath"
+    $envfile = [ordered]@{}
+    Get-Content $envPath -ErrorAction SilentlyContinue | ForEach-Object {
+      $key, $value = $_.split("=")
+      if ($key) { $envfile[$key] = $value }
+    }
+    Set-EnvValue $envPath "WSL_DISTRO_NAME" $distroName
+    if ($null -ne $dockerDiskGB) {
+      Set-EnvValue $envPath "DOCKER_SIZE_GB" $dockerDiskGB
+      Write-Host "  DOCKER_SIZE_GB=$dockerDiskGB"
+    }
     function Get-OrAsk($key, $prompt, $default) {
       $cur = $envfile[$key]
       if ($cur) { return $cur }

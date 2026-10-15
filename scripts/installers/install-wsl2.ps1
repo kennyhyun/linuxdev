@@ -204,11 +204,18 @@ if ($importDistro -or $localImage -or (-not $noConfirm)) {
             if ($LASTEXITCODE -ne 0) { Write-Error "Store distro install failed"; exit 1 }
             $installed = $true; $installedDistro = $storeName
         }
-        "3" { & "$PSScriptRoot\..\wsl\install-distro-github.ps1" -EnvFile $envFile; $installed = $true; $installedDistro = "Linuxdev" }
+        "3" {
+            $gh = @{ EnvFile = $envFile }
+            if ($distroName) { $gh.DistroName = $distroName }
+            & "$PSScriptRoot\..\wsl\install-distro-github.ps1" @gh
+            $installed = $true; $installedDistro = if ($distroName) { $distroName } else { "Linuxdev" }
+        }
         "4" {
             $img = if ($localImage) { $localImage } else { Read-Host "Path to .tar or .tar.gz" }
-            & "$PSScriptRoot\..\wsl\install-distro-local.ps1" -ImagePath $img -EnvFile $envFile
-            $installed = $true; $installedDistro = "Linuxdev"
+            $loc = @{ ImagePath = $img; EnvFile = $envFile }
+            if ($distroName) { $loc.DistroName = $distroName }
+            & "$PSScriptRoot\..\wsl\install-distro-local.ps1" @loc
+            $installed = $true; $installedDistro = if ($distroName) { $distroName } else { "Linuxdev" }
         }
         default { Write-Host "Skipped. Run install-distro-*.ps1 later." }
     }

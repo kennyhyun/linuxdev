@@ -2,9 +2,22 @@
 # Usage: . "$PSScriptRoot\..\common\wsl-utils.ps1"
 
 $script:DefaultDistroName = "Linuxdev"
-$script:DefaultDistroDir  = "$env:USERPROFILE\linuxdev\distro"
+$script:DefaultDistroDir  = "$env:USERPROFILE\.linuxdev\$script:DefaultDistroName\distro"
 $script:DefaultVhdxPath   = "$script:DefaultDistroDir\ext4.vhdx"
 $script:GithubRepo        = "kennyhyun/linuxdev"
+
+# Per-distro data location: %USERPROFILE%\.linuxdev\<DistroName>\{disks,distro}
+#   Get-LinuxdevDir "linuxdev"           -> C:\Users\me\.linuxdev\linuxdev
+#   Get-LinuxdevDir "linuxdev" "disks"   -> C:\Users\me\.linuxdev\linuxdev\disks
+function Get-LinuxdevDir {
+    param(
+        [Parameter(Mandatory)][string]$DistroName,
+        [string]$Sub = ""
+    )
+    $base = Join-Path $env:USERPROFILE ".linuxdev\$DistroName"
+    if ($Sub) { return Join-Path $base $Sub }
+    return $base
+}
 
 function Refresh-Path {
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +

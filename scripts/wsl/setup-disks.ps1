@@ -30,14 +30,17 @@
 
 param(
     [string]$DistroName = "Debian",
-    [string]$DiskDir    = "$env:USERPROFILE\linuxdev\disks",
-    [string]$EnvFile    = "$env:USERPROFILE\linuxdev\.env",
+    [string]$DiskDir    = "",   # default: %USERPROFILE%\.linuxdev\<DistroName>\disks
+    [string]$EnvFile    = "$PSScriptRoot\..\..\.env",
     [switch]$Force,
     [switch]$NoConfirm,
     [switch]$WhatIf
 )
 
 $ErrorActionPreference = "Stop"
+
+. "$PSScriptRoot\..\common\wsl-utils.ps1"
+if (-not $DiskDir) { $DiskDir = Get-LinuxdevDir $DistroName "disks" }
 
 # --- admin check ---
 $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())

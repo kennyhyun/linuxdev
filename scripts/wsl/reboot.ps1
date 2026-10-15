@@ -18,10 +18,10 @@
 
 .PARAMETER TaskName
     Keep-alive scheduled task registered by register-autostart.ps1.
-    Default: LinuxdevWSLKeepAlive.
+    Default: LinuxdevWSLKeepAlive-<DistroName>.
 
 .PARAMETER DiskDir
-    Folder with data.vhdx / docker.vhdx. Default: %USERPROFILE%\linuxdev\disks
+    Folder with data.vhdx / docker.vhdx. Default: %USERPROFILE%\.linuxdev\<DistroName>\disks
 
 .PARAMETER Shutdown
     Use `wsl --shutdown` (stops the whole WSL2 VM, all distros) instead of
@@ -37,8 +37,8 @@
 #>
 param(
     [string]$DistroName = "",
-    [string]$TaskName   = "LinuxdevWSLKeepAlive",
-    [string]$DiskDir    = "$env:USERPROFILE\linuxdev\disks",
+    [string]$TaskName   = "",   # default: LinuxdevWSLKeepAlive-<DistroName>
+    [string]$DiskDir    = "",   # default: %USERPROFILE%\.linuxdev\<DistroName>\disks
     [switch]$Shutdown,
     [int]$TimeoutSec    = 60
 )
@@ -71,6 +71,9 @@ if (-not $DistroName) {
     Write-Error "Distro '$DistroName' not found (installed: $($distros -join ', '))."
     exit 1
 }
+
+if (-not $DiskDir) { $DiskDir = Get-LinuxdevDir $DistroName "disks" }
+if (-not $TaskName) { $TaskName = "LinuxdevWSLKeepAlive-$DistroName" }
 
 # --- the keep-alive task must exist, otherwise nothing re-attaches the vhdx ---
 if (-not (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue)) {

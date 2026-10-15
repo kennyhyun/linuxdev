@@ -5,13 +5,15 @@
 param(
     [Parameter(Mandatory)][string]$ImagePath,
     [string]$DistroName  = "Linuxdev",
-    [string]$DistroDir   = "$env:USERPROFILE\linuxdev\distro",
+    [string]$DistroDir   = "",   # default: %USERPROFILE%\.linuxdev\<DistroName>\distro
     [string]$DefaultUser = "linuxdev",
     [string]$EnvFile     = "$PSScriptRoot\..\..\.env",
     [switch]$SkipPostInstall
 )
 
 . "$PSScriptRoot\..\common\wsl-utils.ps1"
+
+if (-not $DistroDir) { $DistroDir = Get-LinuxdevDir $DistroName "distro" }
 
 if (-not (Test-Path $ImagePath)) { Write-Error "File not found: $ImagePath"; exit 1 }
 

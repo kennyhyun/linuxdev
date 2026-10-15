@@ -16,7 +16,8 @@
     the console handle, so the distro stays alive with no visible window.
 
     This script:
-      1. Writes a VBS launcher (sleep infinity in the distro) to %LOCALAPPDATA%.
+      1. Writes a VBS launcher (sleep infinity in the distro) to
+         %USERPROFILE%\.linuxdev\<DistroName>\.
       2. Registers a logon scheduled task that runs it via wscript.exe.
     systemd (enabled in the distro) then auto-starts the runner/sshd/docker.
 
@@ -24,7 +25,7 @@
     WSL distro name (e.g. "Debian", "Linuxdev"). Required.
 
 .PARAMETER TaskName
-    Scheduled task name. Default: "LinuxdevWSLKeepAlive".
+    Scheduled task name. Default: "LinuxdevWSLKeepAlive-<DistroName>".
 
 .PARAMETER Remove
     Remove the task and the VBS launcher.
@@ -37,32 +38,40 @@
 param(
     [string]$DistroName = "",
 
-    [string]$TaskName = "LinuxdevWSLKeepAlive",
+    [string]$TaskName = "",   # default: LinuxdevWSLKeepAlive-<DistroName>
 
-    [string]$DiskDir = "$env:USERPROFILE\linuxdev\disks",
+    [string]$DiskDir = "",   # default: %USERPROFILE%\.linuxdev\<DistroName>\disks
 
     [switch]$Remove
 )
 
 $ErrorActionPreference = "Stop"
 
-$vbsPath = Join-Path $env:LOCALAPPDATA "linuxdev-wsl-keepalive.vbs"
-$cmdPath = Join-Path $env:LOCALAPPDATA "linuxdev-wsl-keepalive.cmd"
+. "$PSScriptRoot\..\common\wsl-utils.ps1"
 
 if ($Remove) {
+    # The task and launcher are per distro, so the distro name (or -TaskName) is required.
+    if (-not $DistroName -and -not $TaskName) {
+        Write-Error "-Remove needs -DistroName <name> (or -TaskName)."
+        exit 1
+    }
+    if (-not $TaskName) { $TaskName = "LinuxdevWSLKeepAlive-$DistroName" }
     if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
         Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
         Write-Host "Removed scheduled task '$TaskName'."
     } else {
         Write-Host "No scheduled task named '$TaskName' found."
     }
-    if (Test-Path $vbsPath) { Remove-Item $vbsPath -Force; Write-Host "Removed $vbsPath." }
-    if (Test-Path $cmdPath) { Remove-Item $cmdPath -Force; Write-Host "Removed $cmdPath." }
+    if ($DistroName) {
+        foreach ($f in @("keepalive.vbs", "keepalive.cmd")) {
+            $p = Join-Path (Get-LinuxdevDir $DistroName) $f
+            if (Test-Path $p) { Remove-Item $p -Force; Write-Host "Removed $p." }
+        }
+    }
     return
 }
 
 # Verify the distro exists (robust UTF-16 parse via shared helper)
-. "$PSScriptRoot\..\common\wsl-utils.ps1"
 $distros = @(Get-WslDistros)
 
 # Auto-detect the distro name when not given: if exactly one is installed, use
@@ -83,6 +92,14 @@ if (-not $DistroName) {
     Write-Warning "Registering anyway (no-op until the distro exists)."
 }
 
+# Per-distro task + launcher files live with the rest of the distro's data:
+#   %USERPROFILE%\.linuxdev\<DistroName>\keepalive.{cmd,vbs}
+if (-not $TaskName) { $TaskName = "LinuxdevWSLKeepAlive-$DistroName" }
+$stateDir = Get-LinuxdevDir $DistroName
+New-Item -ItemType Directory -Force -Path $stateDir | Out-Null
+$vbsPath = Join-Path $stateDir "keepalive.vbs"
+$cmdPath = Join-Path $stateDir "keepalive.cmd"
+
 # --- 1) Write the VBS keep-alive launcher ---
 # Run(cmd, 0, False): 0 = hidden window (console handle kept alive, unlike
 #   Start-Process -Hidden which drops it), False = don't wait.
@@ -94,6 +111,7 @@ if (-not $DistroName) {
 #
 # A .cmd launcher does the multi-step work; a tiny VBS runs it hidden so the
 # console handle is kept (Start-Process -Hidden drops it and the distro dies).
+if (-not $DiskDir) { $DiskDir = Get-LinuxdevDir $DistroName "disks" }
 $dataVhdx   = Join-Path $DiskDir "data.vhdx"
 $dockerVhdx = Join-Path $DiskDir "docker.vhdx"
 
