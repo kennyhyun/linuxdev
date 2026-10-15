@@ -269,7 +269,7 @@ Writable data lives on **separate rw vhdx volumes** (so rootfs stays read-only):
 | volume | mount | default size |
 |--------|-------|--------------|
 | home.vhdx | /home | 20 GB |
-| docker.vhdx | /var/lib/docker | 50 GB |
+| docker.vhdx | /var/lib/docker | 120 GB |
 | brew.vhdx | /home/linuxbrew | 10 GB |
 
 `docker.vhdx` is created as a **fixed-size** disk by default (the full size is

@@ -13,7 +13,7 @@
 #     and ALWAYS seeds the current rootfs /var + /home into the data volume
 #     (rsync) before emptying the rootfs dirs.
 #
-# Sizes come from .env (DATA_SIZE_GB / DOCKER_SIZE_GB = vhdx size, default 64).
+# Sizes come from .env (DATA_SIZE_GB default 64, DOCKER_SIZE_GB default 120).
 # Disk types come from .env, per disk (default: docker=fixed, data=expandable):
 #   DOCKER_VHDX_TYPE / DATA_VHDX_TYPE  (fixed | expandable)
 #   VHDX_TYPE                          (optional: applies to any disk without its own key)
@@ -58,7 +58,7 @@ function Get-EnvSizeGB {
 }
 
 $DataSizeGB   = Get-EnvSizeGB "DATA_SIZE_GB"   64
-$DockerSizeGB = Get-EnvSizeGB "DOCKER_SIZE_GB" 64
+$DockerSizeGB = Get-EnvSizeGB "DOCKER_SIZE_GB" 120
 
 # --- read a vhdx type from .env: fixed | expandable ---
 # Precedence: <Key> (DATA_VHDX_TYPE / DOCKER_VHDX_TYPE) > VHDX_TYPE > $Default
