@@ -10,6 +10,7 @@ param(
     [switch]$importDistro,
     [switch]$noConfirm,
     [switch]$noShortcut,
+    [switch]$noAutostart,
     [string]$localImage,
     [string]$distroName,
     [string]$envFile = "$PSScriptRoot\..\..\.env"
@@ -261,12 +262,9 @@ if ($importDistro -or $localImage -or (-not $noConfirm)) {
 }
 
 # =============================================
-# Optional: GitLab Runner (CI) -- guidance only
+# Desktop shortcut
 # =============================================
-# The runner is NOT installed here. It is an optional add-on for turning this
-# machine into a CI runner host. The install lives inside the distro (bash) and
-# the auto-start is a Windows scheduled task -- both are run on demand.
-# Desktop shortcut that runs htop in the new distro (skip with setup.ps1 -noshortcut)
+# Shortcut that runs htop in the new distro (skip with setup.ps1 -noshortcut)
 if ($installed -and -not $noShortcut) {
     try {
         & "$PSScriptRoot\..\wsl\create-shortcut.ps1" -DistroName $installedDistro
@@ -275,24 +273,47 @@ if ($installed -and -not $noShortcut) {
     }
 }
 
+# =============================================
+# Auto-start at Windows logon (skip with setup.ps1 -noautostart)
+# =============================================
+# Registers the per-distro scheduled task that attaches the data/docker disks at
+# every logon and keeps the distro running in the background, so services inside
+# it (docker, sshd, microk8s, GitLab runner, ...) stay up. Needs admin (setup.ps1
+# already requires it). Takes effect at the next logon.
+$distroHint = if ($installedDistro) { $installedDistro } else { "<DistroName>" }
+
+Write-Host ""
+if ($installed -and $installedDistro -and -not $noAutostart) {
+    Write-Host "----- Registering auto-start at Windows logon -----"
+    try {
+        $global:LASTEXITCODE = 0
+        & "$PSScriptRoot\..\wsl\register-autostart.ps1" -DistroName $installedDistro
+        if ($LASTEXITCODE -ne 0) { throw "register-autostart.ps1 exited with code $LASTEXITCODE" }
+        Write-Host "  Remove later: .\scripts\wsl\register-autostart.ps1 -DistroName $installedDistro -Remove"
+    } catch {
+        Write-Warning "Could not register auto-start: $_"
+        Write-Warning "Retry in an admin PowerShell: .\scripts\wsl\register-autostart.ps1 -DistroName $installedDistro"
+    }
+} else {
+    Write-Host "Auto-start (disk attach + keep-alive) was not registered."
+    Write-Host "  Register it in an admin PowerShell: .\scripts\wsl\register-autostart.ps1 -DistroName $distroHint"
+}
+Write-Host "----------------------------------------"
+
 Write-Host ""
 Write-Host "----- Optional: GitLab Runner (CI) -----"
 Write-Host "To turn this WSL2 machine into a GitLab CI runner, do this AFTER the"
 Write-Host "distro is installed and bootstrapped (docker is set up):"
 Write-Host ""
-Write-Host "  1) Put the runner token in .env (keeps it out of the command line):"
+Write-Host "  1) Put the runner token in $envFile (keeps it out of the command line):"
 Write-Host "       RUNNER_TOKEN=glrt-xxxxxxxx          # required (GitLab 16+ token)"
 Write-Host "       RUNNER_URL=https://gitlab.imaginetoolbox.com   # optional"
 Write-Host "       RUNNER_TAGS=linux,localstack,runner            # optional"
 Write-Host "       RUNNER_EXECUTOR=docker                         # optional (shell|docker)"
 Write-Host "       RUNNER_DOCKER_IMAGE=whitech/lambda:build-22.11 # optional"
 Write-Host ""
-Write-Host "  2) Register the runner (reads .env, runs install-runner.sh in WSL):"
-$distroHint = if ($installedDistro) { $installedDistro } else { "<DistroName>" }
+Write-Host "  2) Register the runner (reads that env file, runs install-runner.sh in WSL):"
 Write-Host "       .\scripts\wsl\register-runner.ps1 -DistroName $distroHint"
 Write-Host ""
-Write-Host "  3) Auto-start the distro at Windows logon (admin PowerShell):"
-Write-Host "       .\scripts\wsl\register-autostart.ps1 -DistroName $distroHint"
-Write-Host ""
-Write-Host "  Skip all of this if you only need a local dev environment."
+Write-Host "  Skip this if you only need a local dev environment."
 Write-Host "----------------------------------------"

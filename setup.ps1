@@ -36,6 +36,9 @@ If ($args.Contains("-importdistro")) {
 If ($args.Contains("-noshortcut")) {
   $noShortcut = 1
 }
+If ($args.Contains("-noautostart")) {
+  $noAutostart = 1
+}
 # -distroname <name>: name to register the Store distro under (default: linuxdev)
 $distroName = ""
 for ($i = 0; $i -lt $args.Count - 1; $i++) {
@@ -109,6 +112,7 @@ if (-not $hasOptions) {
   Write-Host "   -distroname <name>  name for the WSL distro (default: linuxdev). Settings: ~/.linuxdev/<name>/.env"
   Write-Host "   -dockerdisk <size>  docker disk size, e.g. 64G (default 120G)"
   Write-Host "   -noshortcut   don't create the desktop shortcut (htop in the distro)"
+  Write-Host "   -noautostart  don't register the logon task (disk attach + keep-alive)"
   Write-Host "   -noconfirm    non-interactive (use .env / defaults, no prompts)"
   Write-Host ""
   Write-Host " Examples:"
@@ -301,6 +305,7 @@ switch ($vmBackend) {
         -importDistro:([bool]$importDistro) `
         -noConfirm:([bool]$noConfirm) `
         -noShortcut:([bool]$noShortcut) `
+        -noAutostart:([bool]$noAutostart) `
         -distroName $distroName `
         -envFile $envPath
     if ($LASTEXITCODE -eq 2) {
