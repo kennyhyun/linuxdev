@@ -272,11 +272,29 @@ Writable data lives on **separate rw vhdx volumes** (so rootfs stays read-only):
 | docker.vhdx | /var/lib/docker | 50 GB |
 | brew.vhdx | /home/linuxbrew | 10 GB |
 
-The vhdx files are **dynamically expanding** (near-zero on disk until used).
+The vhdx files (`data.vhdx`, `docker.vhdx`) are created as **fixed-size** disks by
+default (the full size is allocated on the host up front, so creation takes a
+while). To use dynamically expanding disks instead (near-zero on disk until
+used), set this in `.env` before running setup:
+
+```
+VHDX_TYPE=expandable   # fixed (default) | expandable
+```
+
 Create/attach them (recommended for a runner host) with:
 
 ```powershell
 .\scripts\wsl\setup-disks.ps1 -DistroName Linuxdev
+```
+
+### Restarting the distro
+
+After `wsl --terminate` (or if the distro died), restart it **as the same Windows
+user that installed it** (admin PowerShell). This re-attaches the data vhdx and
+keeps the distro alive:
+
+```powershell
+.\scripts\wsl\reboot.ps1                 # add -Shutdown to apply .wslconfig changes
 ```
 
 ### Minimal install (tools only, no VM backend)

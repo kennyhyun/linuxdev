@@ -13,8 +13,13 @@
 #     and ALWAYS seeds the current rootfs /var + /home into the data volume
 #     (rsync) before emptying the rootfs dirs.
 #
-# Sizes come from .env (DATA_SIZE_GB / DOCKER_SIZE_GB = vhdx max size, default 64).
-# The vhdx files are dynamic, so they start small and grow as data is written.
+# Sizes come from .env (DATA_SIZE_GB / DOCKER_SIZE_GB = vhdx size, default 64).
+# Disk type comes from .env VHDX_TYPE:
+#   fixed       (default) -- full size is allocated on disk up front. Creation
+#                            takes a while (zero-fill) but avoids runtime growth
+#                            stalls/fragmentation and guarantees the space.
+#   expandable            -- dynamic; starts small and grows as data is written
+#                            ("dynamic" is accepted as an alias).
 #
 # Usage (Admin PowerShell):
 #   .\scripts\wsl\setup-disks.ps1 -DistroName Debian
@@ -53,6 +58,25 @@ function Get-EnvSizeGB {
 $DataSizeGB   = Get-EnvSizeGB "DATA_SIZE_GB"   64
 $DockerSizeGB = Get-EnvSizeGB "DOCKER_SIZE_GB" 64
 
+# --- read VHDX_TYPE from .env: fixed (default) | expandable ---
+function Get-EnvVhdxType {
+    $val = "fixed"
+    if (Test-Path $EnvFile) {
+        foreach ($line in Get-Content $EnvFile) {
+            if ($line -match "^\s*VHDX_TYPE\s*=\s*([A-Za-z]*)\s*(#.*)?$") {
+                if ($matches[1]) { $val = $matches[1].ToLower() }
+            }
+        }
+    }
+    switch ($val) {
+        "fixed"      { return "fixed" }
+        "expandable" { return "expandable" }
+        "dynamic"    { return "expandable" }
+        default      { Write-Error "Invalid VHDX_TYPE='$val' in $EnvFile (use fixed or expandable)"; exit 1 }
+    }
+}
+$VhdxType = Get-EnvVhdxType
+
 $dataVhdx   = Join-Path $DiskDir "data.vhdx"
 $dockerVhdx = Join-Path $DiskDir "docker.vhdx"
 
@@ -62,8 +86,9 @@ Write-Host "========================================"
 Write-Host " Linuxdev WSL2 disk setup (A1: data + docker)"
 Write-Host " Distro : $DistroName"
 Write-Host " DiskDir: $DiskDir"
-Write-Host " data   : max=${DataSizeGB}G"
-Write-Host " docker : max=${DockerSizeGB}G"
+Write-Host " type   : $VhdxType"
+Write-Host " data   : ${DataSizeGB}G"
+Write-Host " docker : ${DockerSizeGB}G"
 if ($WhatIf) { Write-Host " MODE   : DRY RUN (no changes)" }
 Write-Host "========================================"
 
@@ -111,16 +136,28 @@ function Invoke-Step {
     & $Action
 }
 
-# --- diskpart helper to create an empty expandable vhdx ---
+# --- diskpart helper to create an empty vhdx ($VhdxType: fixed | expandable) ---
 function New-EmptyVhdx {
     param([string]$Path, [int]$SizeGB)
     $sizeMB = [long]$SizeGB * 1024
-    $script = "create vdisk file=`"$Path`" maximum=$sizeMB type=expandable"
+    $script = "create vdisk file=`"$Path`" maximum=$sizeMB type=$VhdxType"
     $tmp = "$env:TEMP\linuxdev-disk-create.txt"
     $script | Set-Content $tmp -Encoding ASCII
     diskpart /s $tmp | Out-Null
     Remove-Item $tmp -Force -ErrorAction SilentlyContinue
     if (-not (Test-Path $Path)) { Write-Error "diskpart failed to create $Path" }
+}
+
+# --- fixed disks allocate everything up front: make sure there is room ---
+if ($VhdxType -eq "fixed" -and -not $WhatIf) {
+    $driveName = (Split-Path -Qualifier (Resolve-Path $DiskDir).Path).TrimEnd(':')
+    $freeGB    = [math]::Floor((Get-PSDrive -Name $driveName).Free / 1GB)
+    $needGB    = $DataSizeGB + $DockerSizeGB
+    if ($freeGB -lt $needGB) {
+        Write-Error "Not enough free space on ${driveName}: for fixed disks (need ${needGB}G, free ${freeGB}G). Lower DATA_SIZE_GB/DOCKER_SIZE_GB or set VHDX_TYPE=expandable in $EnvFile."
+        exit 1
+    }
+    Write-Host "Fixed disks: allocating ${needGB}G up front (free on ${driveName}: ${freeGB}G). This can take several minutes."
 }
 
 # =====================================================================
