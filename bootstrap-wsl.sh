@@ -22,6 +22,9 @@
 # Options:
 #   --user <name>      Set default username (skips prompt; default 'linuxdev')
 #   --envfile <path>   Load .env (NAME, DOTFILES_REPO, __VM__*, __VMHOSTS__*)
+#   --passfile <path>  Random password file for the new user. Reused if it
+#                      already holds a password, otherwise generated + written
+#                      (post-install.ps1 passes %USERPROFILE%\.linuxdev\<distro>\password)
 #   --noninteractive   No prompts; use .env / defaults (used by setup.ps1)
 #   --skip-pkgs        Skip package installation
 #   --export           Print export instructions at end
@@ -97,12 +100,14 @@ EXPORT_AFTER=0
 SKIP_PACKAGES=0
 NONINTERACTIVE=0
 ENVFILE=""
+PASSFILE=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --user)           USERNAME="$2"; shift 2 ;;
         --name)           MACHINE_NAME="$2"; shift 2 ;;
         --envfile)        ENVFILE="$2"; shift 2 ;;
+        --passfile)       PASSFILE="$2"; shift 2 ;;
         --noninteractive) NONINTERACTIVE=1; shift ;;
         --export)         EXPORT_AFTER=1; shift ;;
         --skip-pkgs)      SKIP_PACKAGES=1; shift ;;
@@ -251,8 +256,28 @@ if ! id "$USERNAME" &>/dev/null; then
         useradd -m -u 1000 -s /bin/zsh "$USERNAME"
     usermod -aG docker "$USERNAME" 2>/dev/null || true
     usermod -aG microk8s "$USERNAME" 2>/dev/null || true
-    echo "$USERNAME:$USERNAME" | chpasswd
-    log "User $USERNAME created (UID $(id -u "$USERNAME"); default password: $USERNAME -- change with: passwd)"
+    # Random password (never the username). Reuse an existing passfile so a
+    # re-run keeps the password the user already has on record.
+    USER_PASS=""
+    if [ -n "$PASSFILE" ] && [ -s "$PASSFILE" ]; then
+        USER_PASS="$(head -n1 "$PASSFILE" | tr -d '\r\n')"
+    fi
+    if [ -z "$USER_PASS" ]; then
+        USER_PASS="$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 20)"
+        if [ -n "$PASSFILE" ]; then
+            mkdir -p "$(dirname "$PASSFILE")"
+            ( umask 077; printf '%s\n' "$USER_PASS" > "$PASSFILE" )
+        fi
+    fi
+    printf '%s:%s\n' "$USERNAME" "$USER_PASS" | chpasswd
+    if [ -n "$PASSFILE" ]; then
+        log "User $USERNAME created (UID $(id -u "$USERNAME"); random password saved to $PASSFILE)"
+    else
+        log "User $USERNAME created (UID $(id -u "$USERNAME"); random password set -- no --passfile given)"
+        # stdout only: never write the password into the durable bootstrap log
+        echo "[bootstrap] Password for $USERNAME: $USER_PASS  (note it now)"
+    fi
+    unset USER_PASS
 else
     log "User $USERNAME already exists (UID $(id -u "$USERNAME")) -- updating shell and groups"
     usermod -s /bin/zsh "$USERNAME" 2>/dev/null || true

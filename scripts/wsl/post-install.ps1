@@ -41,6 +41,12 @@ if (Test-Path $EnvFile) {
 }
 $envUnc = ConvertTo-WslPath $EnvFile
 
+# Random user password lives at %USERPROFILE%\.linuxdev\<DistroName>\password
+# (bootstrap-wsl.sh generates it on first user creation, reuses it otherwise).
+$passFile = Join-Path (Get-LinuxdevDir $DistroName) "password"
+New-Item -ItemType Directory -Force -Path (Split-Path $passFile) | Out-Null
+$passUnc = ConvertTo-WslPath $passFile
+
 Write-Host "========================================"
 Write-Host " Post-install: $DistroName"
 Write-Host " Default user: $DefaultUser"
@@ -72,9 +78,15 @@ Write-Host ""
 Write-Host "Running bootstrap-wsl.sh inside WSL..."
 Write-Host "  (installs packages, creates user '$DefaultUser' @ UID 1000, systemd, rootfs-ro)"
 
-wsl -d $DistroName -u root -- bash "$wslRoot/bootstrap-wsl.sh" --noninteractive --envfile "$envUnc" --user $DefaultUser --name $DistroName
+wsl -d $DistroName -u root -- bash "$wslRoot/bootstrap-wsl.sh" --noninteractive --envfile "$envUnc" --passfile "$passUnc" --user $DefaultUser --name $DistroName
 if ($LASTEXITCODE -ne 0) {
     Write-Host "WARNING: bootstrap-wsl.sh returned $LASTEXITCODE - check output above"
+}
+
+# Restrict the password file to the current user (drvfs ignores chmod).
+if (Test-Path $passFile) {
+    icacls $passFile /inheritance:r /grant:r "$($env:USERNAME):(R,W)" | Out-Null
+    Write-Host "  Password for '$DefaultUser' saved to $passFile"
 }
 
 # =============================================
