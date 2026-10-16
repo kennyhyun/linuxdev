@@ -42,6 +42,12 @@ param(
 
     [string]$DiskDir = "",   # default: %USERPROFILE%\.linuxdev\<DistroName>\disks
 
+    # Port-forward host:<SshForwardPort> -> WSL:<SshTargetPort> on each keepalive
+    # run (netsh portproxy + firewall). Set SshForwardPort to 0 to disable.
+    [int]$SshForwardPort = 2222,
+
+    [int]$SshTargetPort = 22,
+
     [switch]$Remove
 )
 
@@ -67,6 +73,12 @@ if ($Remove) {
             $p = Join-Path (Get-LinuxdevDir $DistroName) $f
             if (Test-Path $p) { Remove-Item $p -Force; Write-Host "Removed $p." }
         }
+    }
+    # Tear down the SSH port-forward (portproxy + firewall) if one was set up.
+    if ($SshForwardPort -gt 0) {
+        netsh interface portproxy delete v4tov4 listenport=$SshForwardPort listenaddress=0.0.0.0 2>$null | Out-Null
+        Remove-NetFirewallRule -DisplayName "Linuxdev WSL SSH ($SshForwardPort)" -ErrorAction SilentlyContinue
+        Write-Host "Removed portproxy + firewall rule for port $SshForwardPort."
     }
     return
 }
@@ -115,12 +127,36 @@ if (-not $DiskDir) { $DiskDir = Get-LinuxdevDir $DistroName "disks" }
 $dataVhdx   = Join-Path $DiskDir "data.vhdx"
 $dockerVhdx = Join-Path $DiskDir "docker.vhdx"
 
+if ($SshForwardPort -gt 0) {
+    $fwName = "Linuxdev WSL SSH ($SshForwardPort)"
+    $portFwdBlock = @"
+rem --- SSH port-forward: host:$SshForwardPort -> WSL:$SshTargetPort ---
+rem Wait for the distro's network to come up, then capture its (volatile) IP.
+set WSLIP=
+for /l %%n in (1,1,15) do (
+  if not defined WSLIP (
+    for /f "usebackq tokens=1" %%i in (``wsl -d $DistroName -- hostname -I 2^>nul``) do set WSLIP=%%i
+    if not defined WSLIP ping -n 2 127.0.0.1 >nul
+  )
+)
+if defined WSLIP (
+  netsh interface portproxy delete v4tov4 listenport=$SshForwardPort listenaddress=0.0.0.0 >nul 2>&1
+  netsh interface portproxy add    v4tov4 listenport=$SshForwardPort listenaddress=0.0.0.0 connectport=$SshTargetPort connectaddress=%WSLIP%
+  powershell -NoProfile -Command "if (-not (Get-NetFirewallRule -DisplayName '$fwName' -ErrorAction SilentlyContinue)) { New-NetFirewallRule -DisplayName '$fwName' -Direction Inbound -Action Allow -Protocol TCP -LocalPort $SshForwardPort | Out-Null }"
+)
+"@
+} else {
+    $portFwdBlock = ""
+}
+
 $cmd = @"
 @echo off
 rem Linuxdev WSL autostart: attach data disks, then keep the distro alive.
 if exist "$dataVhdx"   wsl --mount --vhd "$dataVhdx" --bare
 if exist "$dockerVhdx" wsl --mount --vhd "$dockerVhdx" --bare
 wsl --terminate $DistroName
+wsl -d $DistroName -u root -- echo ready >nul
+$portFwdBlock
 wsl -d $DistroName -u root -- sleep infinity
 "@
 Set-Content -Path $cmdPath -Value $cmd -Encoding ASCII
@@ -166,6 +202,9 @@ Write-Host " Registered scheduled task '$TaskName'"
 Write-Host "   runs:     wscript.exe $vbsPath"
 Write-Host "   which:    cmd $cmdPath (attach vhdx -> terminate -> sleep infinity)"
 Write-Host "   runs as:  $currentUser (interactive, at logon)"
+if ($SshForwardPort -gt 0) {
+Write-Host "   ssh fwd:  host:$SshForwardPort -> WSL:$SshTargetPort (netsh portproxy + firewall, refreshed each run)"
+}
 Write-Host ""
 Write-Host " Test now:  Start-ScheduledTask -TaskName $TaskName"
 Write-Host "            Start-Sleep 10; wsl -l --running"
